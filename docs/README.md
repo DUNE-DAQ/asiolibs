@@ -1,3 +1,3 @@
-# Edit Me
+# Asiolibs
 
-Modify this README to describe your repository.
+Boost.Asio-based socket reader plugin for low-bandwidth devices

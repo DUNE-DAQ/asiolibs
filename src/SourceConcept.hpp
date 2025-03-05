@@ -1,4 +1,3 @@
-// TODO duplication and what is this, dpdklibse depend etmek mantikli gelmedi
 
 /**
  * @file SourceConcept.hpp SourceConcept for constructors and

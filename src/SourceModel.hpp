@@ -19,6 +19,7 @@
 
 // #include "datahandlinglibs/utils/ReusableThread.hpp"
 #include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
+#include "datahandlinglibs/utils/BufferCopy.hpp" 
 
 // #include <folly/ProducerConsumerQueue.h>
 // #include <nlohmann/json.hpp>
@@ -52,10 +53,10 @@ public:
   {
     m_callback_mode = callback_mode;
     if (callback_mode) {
-      TLOG(5) << "Callback mode requested. Won't acquire iom sender!";
+      TLOG_DEBUG(5) << "Callback mode requested. Won't acquire iom sender!";
     } else {
       if (m_sink_is_set) {
-        TLOG(5) << "SourceModel sink is already set in initialized!";
+        TLOG_DEBUG(5) << "SourceModel sink is already set in initialized!";
       } else {
         m_sink_queue = get_iom_sender<TargetPayloadType>(sink_name);
         m_sink_is_set = true;
@@ -67,7 +68,7 @@ public:
   {
     if (m_callback_mode) {
       if (m_callback_is_acquired) {
-        TLOG(5) << "SourceModel callback is already acquired!";
+        TLOG_DEBUG(5) << "SourceModel callback is already acquired!";
       } else {
         // Getting DataMoveCBRegistry
         auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
@@ -75,7 +76,7 @@ public:
         m_callback_is_acquired = true;
       }
     } else {
-      TLOG(5) << "Won't acquire callback, as IOM sink is set!";
+      TLOG_DEBUG(5) << "Won't acquire callback, as IOM sink is set!";
     }
   }
 

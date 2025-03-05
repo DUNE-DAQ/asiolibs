@@ -14,22 +14,22 @@ find_package(opmonlib REQUIRED)
 
 daq_protobuf_codegen(opmon/*.proto)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2")
-
 ##############################################################################
 # Dependency sets
 set(DUNEDAQ_DEPENDENCIES datahandlinglibs::datahandlinglibs fddetdataformats::fddetdataformats fdreadoutlibs::fdreadoutlibs)
 
 ##############################################################################
 # Main library
-daq_add_library(*.cpp LINK_LIBRARIES appfwk::appfwk ${DUNEDAQ_DEPENDENCIES})
+daq_add_library(*.cpp LINK_LIBRARIES ${DUNEDAQ_DEPENDENCIES})
 
+##############################################################################
 # Plugins
-daq_add_plugin(SocketReaderModule duneDAQModule LINK_LIBRARIES asiolibs)
+daq_add_plugin(SocketReaderModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
+daq_add_plugin(FakeSocketWriterModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
 
 ##############################################################################
 # Integration tests
-#daq_add_application(asiolibs_test_socket_receiver test_socket_receiver.cxx TEST LINK_LIBRARIES asiolibs opmonlib::opmonlib)
+#daq_add_application(asiolibs_test_socket_reader_module test_socket_reader_module.cxx TEST LINK_LIBRARIES asiolibs opmonlib::opmonlib)
 
 ##############################################################################
 
