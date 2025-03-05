@@ -1,12 +1,12 @@
 /**
- * @file SocketReaderModule.cpp Boost.Asio-based socket reader plugin for low-bandwidth devices
+ * @file FakeSocketWriterModule.cpp Boost.Asio-based fake socket writer plugin for low-bandwidth devices
  *
  * This is part of the DUNE DAQ , copyright 2020.
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
 
-#include "SocketReaderModule.hpp"
+#include "FakeSocketWriterModule.hpp"
 
 #include "CreateSource.hpp"
 
@@ -22,17 +22,17 @@
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
-#include "asiolibs/opmon/SocketReaderModule.pb.h"
+#include "asiolibs/opmon/FakeSocketWriterModule.pb.h"
 
 namespace dunedaq::asiolibs {
 
-SocketReaderModule::SocketReaderModule(const std::string& name)
+FakeSocketWriterModule::FakeSocketWriterModule(const std::string& name)
   : DAQModule(name)
   , m_work_guard(boost::asio::make_work_guard(m_io_context))
 {
-  register_command("conf", &SocketReaderModule::do_configure);
-  register_command("start", &SocketReaderModule::do_start);
-  register_command("stop_trigger_sources", &SocketReaderModule::do_stop);
+  register_command("conf", &FakeSocketWriterModule::do_configure);
+  register_command("start", &FakeSocketWriterModule::do_start);
+  register_command("stop_trigger_sources", &FakeSocketWriterModule::do_stop);
 }
 
 inline void
@@ -47,7 +47,7 @@ tokenize(std::string const& str, const char delim, std::vector<std::string>& out
 }
 
 void
-SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
+FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
 {
   m_cfg = mcfg;
   auto* mdal = m_cfg->module<appmodel::DataReaderModule>(get_name());
@@ -119,25 +119,25 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
         const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketWriterModule>();
-        m_reader_configs.emplace_back(address, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
+        m_writer_configs.emplace_back(address, socket_sender->get_port(), std::make_shared<SocketStats>());
       }
     }
   }
 
-  m_readers.reserve(m_reader_configs.size());
+  m_writers.reserve(m_writer_configs.size());
   if (m_socket_type == SocketType::TCP) {
-    for(std::size_t i = 0; i < m_reader_configs.size(); ++i) {
-      m_readers.emplace_back(TCPReader());
+    for(std::size_t i = 0; i < m_writer_configs.size(); ++i) {
+      m_writers.emplace_back(FakeTCPWriter());
     }      
   } else {
-    for(std::size_t i = 0; i < m_reader_configs.size(); ++i) {
-      m_readers.emplace_back(UDPReader());
+    for(std::size_t i = 0; i < m_writer_configs.size(); ++i) {
+      m_writers.emplace_back(FakeUDPWriter());
     }        
   }
 
   if (mdal->get_outputs().empty()) {
     auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No outputs defined for socket reader in configuration.");
+                                                              "No outputs defined for socket writer in configuration.");
     ers::fatal(err);
     throw err;
   }
@@ -150,6 +150,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
       throw err;
     }
 
+    // dte: not sure if I need this at all
     // Check for CB prefix indicating Callback use
     const char delim = '_';
     const std::string target = queue->UID();
@@ -162,32 +163,32 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
     }
 
     auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
-    register_node(queue->UID(), ptr);
+    register_node(queue->UID(), ptr);  
   }
 }
 
-SocketReaderModule::SocketType
-SocketReaderModule::string_to_socket_type(const std::string& socket_type) const
+FakeSocketWriterModule::SocketType
+FakeSocketWriterModule::string_to_socket_type(const std::string& socket_type) const
 {
   if (socket_type == "TCP") {
-    return SocketReaderModule::SocketType::TCP;
+    return FakeSocketWriterModule::SocketType::TCP;
   } else if (socket_type == "UDP") {
-    return SocketReaderModule::SocketType::UDP;
+    return FakeSocketWriterModule::SocketType::UDP;
   }
-  return SocketReaderModule::SocketType::INVALID;
+  return FakeSocketWriterModule::SocketType::INVALID;
 }
 
 void
-SocketReaderModule::do_configure(const data_t&)
+FakeSocketWriterModule::do_configure(const data_t&)
 {
-  for (std::size_t i = 0; i < m_readers.size(); ++i) {
-    const auto reader_config = m_reader_configs[i];
-    std::visit([this, reader_config](auto& reader) { reader.configure(m_io_context, reader_config); }, m_readers[i]);
+  for (std::size_t i = 0; i < m_writers.size(); ++i) {
+    const auto writer_config = m_writer_configs[i];
+    std::visit([this, writer_config](auto& writer) { writer.configure(m_io_context, writer_config); }, m_writers[i]);
   }
 }
 
 void
-SocketReaderModule::do_start(const data_t&)
+FakeSocketWriterModule::do_start(const data_t&)
 {
   // Setup callbacks on all sourcemodels
   for (auto& [sourceid, source] : m_sources) {
@@ -195,34 +196,33 @@ SocketReaderModule::do_start(const data_t&)
   }
 
   m_io_thread = std::jthread([this] { m_io_context.run(); });
-
-  for (auto& reader : m_readers) {
-    boost::asio::co_spawn(m_io_context,
-                          std::visit([this](auto& reader) { return reader.start(m_sources); }, reader),
-                          boost::asio::detached);
+  for (auto& writer : m_writers) {
+      boost::asio::co_spawn(m_io_context,
+                            std::visit([this](auto& writer) { return writer.start(); }, writer),
+                            boost::asio::detached);
   }
 }
 
 void
-SocketReaderModule::do_stop(const data_t&)
+FakeSocketWriterModule::do_stop(const data_t&)
 {
-  for (auto& reader : m_readers) {
-    std::visit([](auto& reader) { reader.stop(); }, reader);
+  for (auto& writer : m_writers) {
+    std::visit([](auto& writer) { writer.stop(); }, writer);
   }
-
-  m_work_guard.reset();
+  
+  m_work_guard.reset();    
 }
 
 void 
-SocketReaderModule::generate_opmon_data() {
-  for (const auto& reader_config : m_reader_configs) {
-    opmon::SocketReaderStats stats;
-    stats.set_packets_received(reader_config.socket_stats->packets_received.load());
-    stats.set_bytes_received(reader_config.socket_stats->bytes_received.load());
-    publish(std::move(stats), {{"socket-reader", std::to_string(reader_config.port)}});  
+FakeSocketWriterModule::generate_opmon_data() {
+  for (const auto& writer_config : m_writer_configs) {
+    opmon::SocketWriterStats stats;
+    stats.set_packets_sent(writer_config.socket_stats->packets_sent.load());
+    stats.set_bytes_sent(writer_config.socket_stats->bytes_sent.load());
+    publish(std::move(stats), {{"socket-writer", std::to_string(writer_config.port)}});  
   }
 }
 
 } // namespace dunedaq::asiolibs
 
-DEFINE_DUNE_DAQ_MODULE(dunedaq::asiolibs::SocketReaderModule)
+DEFINE_DUNE_DAQ_MODULE(dunedaq::asiolibs::FakeSocketWriterModule)
