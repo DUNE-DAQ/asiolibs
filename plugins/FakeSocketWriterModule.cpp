@@ -10,10 +10,10 @@
 
 #include "CreateSource.hpp"
 
-#include "appmodel/DataReaderModule.hpp"
+#include "appmodel/SocketDataWriterModule.hpp"
 #include "appmodel/NWDetDataSender.hpp"
-#include "appmodel/FakeSocketWriterModule.hpp"
-#include "appmodel/SocketReaderConf.hpp"
+#include "appmodel/FakeSocketDataSender.hpp"
+#include "appmodel/SocketWriterConf.hpp"
 #include "appmodel/SocketReceiver.hpp"
 #include "confmodel/DetectorStream.hpp"
 #include "confmodel/DetectorToDaqConnection.hpp"
@@ -50,26 +50,14 @@ void
 FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
 {
   m_cfg = mcfg;
-  auto* mdal = m_cfg->module<appmodel::DataReaderModule>(get_name());
-  auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketReaderConf>();
+  auto* mdal = m_cfg->module<appmodel::SocketDataWriterModule>(get_name());
+  auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketWriterConf>();
 
-  const std::optional address = module_conf->get_ip_address();
+  const auto remote_ip = module_conf->get_remote_ip();
 
   m_socket_type = string_to_socket_type(module_conf->get_socket_type());
-  switch (m_socket_type) {
-    case SocketType::TCP: {
-      if (!address) {
-        throw std::invalid_argument("Error: TCP requires an IP address!");
-      }
-      break;
-    }
-    case SocketType::UDP: {
-      break;
-    }
-    default: {
-      throw std::invalid_argument("Error: Only TCP and UDP are allowed!");
-      break;
-    }
+  if (m_socket_type != SocketType::TCP && m_socket_type != SocketType::UDP) {
+    throw std::invalid_argument("Error: Only TCP and UDP are allowed!");
   }
 
   std::vector<const confmodel::DetectorToDaqConnection*> d2d_conns;
@@ -118,8 +106,8 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
-        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketWriterModule>();
-        m_writer_configs.emplace_back(address, socket_sender->get_port(), std::make_shared<SocketStats>());
+        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
+        m_writer_configs.emplace_back(remote_ip, socket_sender->get_port(), std::make_shared<SocketStats>());
       }
     }
   }
@@ -135,36 +123,36 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
     }        
   }
 
-  if (mdal->get_outputs().empty()) {
-    auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No outputs defined for socket writer in configuration.");
-    ers::fatal(err);
-    throw err;
-  }
+  // if (mdal->get_outputs().empty()) {
+  //   auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
+  //                                                             "No outputs defined for socket writer in configuration.");
+  //   ers::fatal(err);
+  //   throw err;
+  // }
 
-  for (auto* con : mdal->get_outputs()) {
-    auto* queue = con->cast<confmodel::QueueWithSourceId>();
-    if (queue == nullptr) {
-      auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
-      ers::fatal(err);
-      throw err;
-    }
+  // for (auto* con : mdal->get_outputs()) {
+  //   auto* queue = con->cast<confmodel::QueueWithSourceId>();
+  //   if (queue == nullptr) {
+  //     auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
+  //     ers::fatal(err);
+  //     throw err;
+  //   }
 
-    // dte: not sure if I need this at all
-    // Check for CB prefix indicating Callback use
-    const char delim = '_';
-    const std::string target = queue->UID();
-    std::vector<std::string> words;
-    tokenize(target, delim, words);
+  //   // dte: not sure if I need this at all
+  //   // Check for CB prefix indicating Callback use
+  //   const char delim = '_';
+  //   const std::string target = queue->UID();
+  //   std::vector<std::string> words;
+  //   tokenize(target, delim, words);
 
-    bool callback_mode = false;
-    if (words.front() == "cb") {
-      callback_mode = true;
-    }
+  //   bool callback_mode = false;
+  //   if (words.front() == "cb") {
+  //     callback_mode = true;
+  //   }
 
-    auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
-    register_node(queue->UID(), ptr);  
-  }
+  //   auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
+  //   register_node(queue->UID(), ptr);  
+  // }
 }
 
 FakeSocketWriterModule::SocketType
@@ -182,8 +170,8 @@ void
 FakeSocketWriterModule::do_configure(const data_t&)
 {
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
-    const auto writer_config = m_writer_configs[i];
-    std::visit([this, writer_config](auto& writer) { writer.configure(m_io_context, writer_config); }, m_writers[i]);
+    const auto& writer_config = m_writer_configs[i];
+    std::visit([this, &writer_config](auto& writer) { writer.configure(m_io_context, writer_config); }, m_writers[i]);
   }
 }
 
@@ -196,9 +184,9 @@ FakeSocketWriterModule::do_start(const data_t&)
   }
 
   m_io_thread = std::jthread([this] { m_io_context.run(); });
-  for (auto& writer : m_writers) {
+  for (std::size_t i = 0; i < m_writers.size(); ++i) {
       boost::asio::co_spawn(m_io_context,
-                            std::visit([this](auto& writer) { return writer.start(); }, writer),
+                            std::visit([this](auto& writer) { return writer.start(); }, m_writers[i]),
                             boost::asio::detached);
   }
 }
@@ -219,7 +207,7 @@ FakeSocketWriterModule::generate_opmon_data() {
     opmon::SocketWriterStats stats;
     stats.set_packets_sent(writer_config.socket_stats->packets_sent.load());
     stats.set_bytes_sent(writer_config.socket_stats->bytes_sent.load());
-    publish(std::move(stats), {{"socket-writer", std::to_string(writer_config.port)}});  
+    publish(std::move(stats), {{"socket-writer", std::to_string(writer_config.remote_port)}});  
   }
 }
 
