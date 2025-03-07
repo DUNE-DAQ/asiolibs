@@ -12,7 +12,7 @@
 
 #include "appmodel/DataReaderModule.hpp"
 #include "appmodel/NWDetDataSender.hpp"
-#include "appmodel/FakeSocketWriterModule.hpp"
+#include "appmodel/FakeSocketDataSender.hpp"
 #include "appmodel/SocketReaderConf.hpp"
 #include "appmodel/SocketReceiver.hpp"
 #include "confmodel/DetectorStream.hpp"
@@ -52,24 +52,12 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
   m_cfg = mcfg;
   auto* mdal = m_cfg->module<appmodel::DataReaderModule>(get_name());
   auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketReaderConf>();
-
-  const std::optional address = module_conf->get_ip_address();
+  
+  const auto local_ip = module_conf->get_local_ip();
 
   m_socket_type = string_to_socket_type(module_conf->get_socket_type());
-  switch (m_socket_type) {
-    case SocketType::TCP: {
-      if (!address) {
-        throw std::invalid_argument("Error: TCP requires an IP address!");
-      }
-      break;
-    }
-    case SocketType::UDP: {
-      break;
-    }
-    default: {
-      throw std::invalid_argument("Error: Only TCP and UDP are allowed!");
-      break;
-    }
+  if (m_socket_type != SocketType::TCP && m_socket_type != SocketType::UDP) {
+    throw std::invalid_argument("Error: Only TCP and UDP are allowed!");
   }
 
   std::vector<const confmodel::DetectorToDaqConnection*> d2d_conns;
@@ -118,8 +106,8 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
-        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketWriterModule>();
-        m_reader_configs.emplace_back(address, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
+        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
+        m_reader_configs.emplace_back(local_ip, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
       }
     }
   }
@@ -219,7 +207,7 @@ SocketReaderModule::generate_opmon_data() {
     opmon::SocketReaderStats stats;
     stats.set_packets_received(reader_config.socket_stats->packets_received.load());
     stats.set_bytes_received(reader_config.socket_stats->bytes_received.load());
-    publish(std::move(stats), {{"socket-reader", std::to_string(reader_config.port)}});  
+    publish(std::move(stats), {{"socket-reader", std::to_string(reader_config.local_port)}});  
   }
 }
 

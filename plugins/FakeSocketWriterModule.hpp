@@ -27,6 +27,69 @@ using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
  */
 constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
 
+/**
+ * @brief Maximum packet sequence ID before reset (dte: meaning of)
+ */
+constexpr uint64_t max_seq_id = 4095;
+
+/**
+ * @brief Timestamp difference between packets (dte: meaning of 32 and 64)
+ */
+constexpr uint64_t timestamp_diff = 32 * 64;
+
+/**
+ * @brief Fake packet detector ID (dte: meaning of)
+ */
+constexpr uint64_t fake_det_id = 3;
+
+/**
+ * @brief Fake packet stream ID
+ */
+constexpr uint64_t fake_stream_id = 0;
+
+/**
+ * @brief Fake packet block length (dte: meaning of)
+ */
+constexpr uint64_t fake_block_length = 0x382;
+
+/**
+ * @brief Calculate the next fake sequence ID for a packet
+ * @param seq_id Fake packet sequence ID
+ */
+void fake_sequence_id(uint64_t& seq_id) {
+  seq_id = seq_id == max_seq_id ? 0 : ++seq_id;
+}
+
+/**
+ * @brief Calculate the next fake timestamp for a packet
+ * @param timestamp Fake packet timestamp
+ */
+void fake_timestamp(uint64_t& timestamp) {
+  if (timestamp != 0) {
+    timestamp += timestamp_diff;
+  }      
+}
+
+/**
+ * @brief Create a fake packet
+ * @param frame Fake packet
+ * @param seq_id Fake packet sequence ID
+ * @param timestamp Fake packet timestamp
+ */
+void fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp) {
+  constexpr uint64_t det_id = fake_det_id;
+  constexpr uint64_t stream_id = fake_stream_id;
+  constexpr uint64_t block_length = fake_block_length;
+
+  frame.daq_header.det_id = det_id;
+  frame.daq_header.stream_id = stream_id;
+  fake_sequence_id(seq_id);
+  frame.daq_header.seq_id = seq_id;
+  frame.daq_header.block_length = block_length;
+  fake_timestamp(timestamp);
+  frame.daq_header.timestamp = timestamp; 
+}
+
 class FakeSocketWriterModule : public dunedaq::appfwk::DAQModule
 {
 public:
@@ -71,14 +134,14 @@ private:
   struct WriterConfig
   {
     /**
-     * @brief Destination IP
+     * @brief Destination IP address
      */
-    std::optional<std::string> address;
+    std::string remote_ip;
 
     /**
-     * @brief Port number
+     * @brief Destination port number
      */
-    ushort port;
+    ushort remote_port;
 
     /**
      * @brief Statistics of socket traffic
@@ -92,21 +155,57 @@ private:
     /**
      * @brief Asynchronously creates and connects a TCP socket
      * @param io_context I/O context for socket creation
-     * @param writer_config TCP writer configuration
-     * @return Coroutine handle
+     * @param writer_config TCP reader configuration
      * @throws boost::system::system_error on failure
      */
-    boost::asio::awaitable<void> configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
+    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
     {
+      m_socket_stats = writer_config.socket_stats;
+
+      m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);      
+
+      while (true) {
+        try {
+          m_socket->connect(
+            boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(writer_config.remote_ip),
+              writer_config.remote_port));
+          
+          TLOG() << "Successfully connected to " << writer_config.remote_ip << ":" << writer_config.remote_port;
+          break; // Exit loop on success
+        } catch (const boost::system::system_error& e) {
+          TLOG() << "Connection failed: " << e.what() << ". Retrying in 1 second...";
+          std::this_thread::sleep_for(std::chrono::seconds(1)); // Wait before retrying
+        }
+      }
+
+      TLOG() << "Established TCP connection to " << writer_config.remote_ip << ":" << writer_config.remote_port;
     }
 
     /**
      * @brief Asynchronously reads data from the socket in a loop
-     * @param sources Data sources
+     * @param writer_config TCP writer configuration
      * @return Coroutine handle
      */
     boost::asio::awaitable<void> start()
     {
+      fddetdataformats::WIBEthFrame frame;
+      uint64_t seq_id = 0;      
+      uint64_t timestamp = 0;
+      constexpr auto rate_limit_khz = 30.5;
+
+      datahandlinglibs::RateLimiter rate_limiter(rate_limit_khz);
+
+      while (m_socket->is_open()) {
+        fake_data(frame, seq_id, timestamp);
+
+        const auto bytes_sent = co_await m_socket->async_send(
+          boost::asio::buffer(&frame, buffer_size), boost::asio::use_awaitable);
+
+        ++m_socket_stats->packets_sent;
+        m_socket_stats->bytes_sent.fetch_add(bytes_sent);
+
+        rate_limiter.limit();
+      }      
     }
 
     /**
@@ -114,6 +213,9 @@ private:
      */
     void stop()
     {      
+      m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+      m_socket->close();
+      TLOG() << "Shutdown TCP connection";      
     }
 
   private:
@@ -125,37 +227,7 @@ private:
     /**
      * @brief Statistics of socket traffic
      */  
-    std::shared_ptr<SocketStats> m_socket_stats;      
-
-    uint64_t fake_timestamp() {
-      static uint64_t timestamp = 0;
-      if (timestamp != 0) {
-        timestamp += 32 * 64;
-      }      
-      return timestamp;
-    }
-
-    uint64_t fake_sequence_id() {
-      static uint64_t seq_id = 0;
-      if (seq_id == 4095) {
-        seq_id = 0;
-      } else {
-        ++seq_id;
-      }
-      return seq_id;
-    }
-
-    void fake_data(fddetdataformats::WIBEthFrame& frame) {
-      constexpr uint64_t fake_det_id = 3; // dte: what is the significance of this number
-      constexpr uint64_t fake_stream_id = 0;
-      constexpr uint64_t fake_block_length = 0x382; // dte: what is the significance of this number
-
-      frame.daq_header.det_id = fake_det_id;
-      frame.daq_header.stream_id = fake_stream_id;
-      frame.daq_header.seq_id = fake_sequence_id();
-      frame.daq_header.block_length = fake_block_length;
-      frame.daq_header.timestamp = fake_timestamp(); 
-    }
+    std::shared_ptr<SocketStats> m_socket_stats;
   };
 
   class FakeUDPWriter
@@ -164,18 +236,17 @@ private:
     /**
      * @brief Creates a UDP socket
      * @param io_context I/O context for socket creation
-     * @param reader_config UDP reader configuration
+     * @param writer_config UDP writer configuration
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& reader_config)
+    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
     {
-      const auto endpoint = reader_config.address
-                              ? boost::asio::ip::udp::endpoint(
-                                  boost::asio::ip::address::from_string(*reader_config.address), reader_config.port)
-                              : boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), reader_config.port);
-      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, endpoint);
+      m_writer_config = writer_config;
+      
+      const boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::udp::v4(), 0); 
+      
+      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, sender_endpoint);
 
-      TLOG() << "Created UDP socket on " << (reader_config.address ? *reader_config.address : "0.0.0.0") << ":"
-                  << reader_config.port;
+      TLOG() << "Created UDP socket on " << m_socket->local_endpoint().address() << ":" << m_socket->local_endpoint().port();
     }
 
     /**
@@ -184,20 +255,24 @@ private:
      */
     boost::asio::awaitable<void> start()
     {
+      boost::asio::ip::udp::endpoint receiver_endpoint(
+        boost::asio::ip::address::from_string(m_writer_config.remote_ip), m_writer_config.remote_port);
+
       fddetdataformats::WIBEthFrame frame;
-      boost::asio::ip::udp::endpoint receiver_endpoint;
+      uint64_t seq_id = 0;      
+      uint64_t timestamp = 0;
       constexpr auto rate_limit_khz = 30.5;
 
       datahandlinglibs::RateLimiter rate_limiter(rate_limit_khz);
 
       while (m_socket->is_open()) {
-        fake_data(frame);
+        fake_data(frame, seq_id, timestamp);
 
         const auto bytes_sent = co_await m_socket->async_send_to(
           boost::asio::buffer(&frame, buffer_size), receiver_endpoint, boost::asio::use_awaitable);
 
-        ++m_socket_stats->packets_sent;
-        m_socket_stats->bytes_sent.fetch_add(bytes_sent);
+        ++m_writer_config.socket_stats->packets_sent;
+        m_writer_config.socket_stats->bytes_sent.fetch_add(bytes_sent);
 
         rate_limiter.limit();
       }
@@ -217,41 +292,11 @@ private:
      * @brief UDP socket
      */
     std::unique_ptr<boost::asio::ip::udp::socket> m_socket;
-
+    
     /**
-     * @brief Statistics of socket traffic
-     */  
-    std::shared_ptr<SocketStats> m_socket_stats;      
-
-    uint64_t fake_timestamp() {
-      static uint64_t timestamp = 0;
-      if (timestamp != 0) {
-        timestamp += 32 * 64;
-      }      
-      return timestamp;
-    }
-
-    uint64_t fake_sequence_id() {
-      static uint64_t seq_id = 0;
-      if (seq_id == 4095) {
-        seq_id = 0;
-      } else {
-        ++seq_id;
-      }
-      return seq_id;
-    }
-
-    void fake_data(fddetdataformats::WIBEthFrame& frame) {
-      constexpr uint64_t fake_det_id = 3; // dte: what is the significance of this number
-      constexpr uint64_t fake_stream_id = 0;
-      constexpr uint64_t fake_block_length = 0x382; // dte: what is the significance of this number
-
-      frame.daq_header.det_id = fake_det_id;
-      frame.daq_header.stream_id = fake_stream_id;
-      frame.daq_header.seq_id = fake_sequence_id();
-      frame.daq_header.block_length = fake_block_length;
-      frame.daq_header.timestamp = fake_timestamp(); 
-    }
+     * @brief Socket writer configuration
+     */    
+    WriterConfig m_writer_config;
   };
 
   // Commands

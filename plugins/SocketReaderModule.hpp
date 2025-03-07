@@ -94,14 +94,14 @@ private:
   struct ReaderConfig
   {
     /**
-     * @brief Destination IP
+     * @brief Source IP address
      */
-    std::optional<std::string> address;
+    std::string local_ip;
 
     /**
-     * @brief Port number
+     * @brief Source port number
      */
-    ushort port;
+    ushort local_port;
 
     /**
      * @brief Detector stream source ID
@@ -121,21 +121,23 @@ private:
      * @brief Asynchronously creates and connects a TCP socket
      * @param io_context I/O context for socket creation
      * @param reader_config TCP reader configuration
-     * @return Coroutine handle
      * @throws boost::system::system_error on failure
      */
-    boost::asio::awaitable<void> configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config)
+    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config)
     {
       m_source_id = reader_config.source_id;
       m_socket_stats = reader_config.socket_stats;
 
       m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);
 
-      co_await m_socket->async_connect(
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(*reader_config.address),
-                                       reader_config.port),
-        boost::asio::use_awaitable);
-      TLOG() << "Established TCP connection to " << *reader_config.address << ":" << reader_config.port;
+      boost::asio::ip::tcp::acceptor acceptor(io_context,
+        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port));
+
+      TLOG() << "Waiting for TCP connection at " << reader_config.local_ip << ":" << reader_config.local_port;
+
+      acceptor.accept(*m_socket);
+
+      TLOG() << "Established TCP connection from " << m_socket->remote_endpoint().address() << ":" << m_socket->remote_endpoint().port();
     }
 
     /**
@@ -199,14 +201,11 @@ private:
       m_source_id = reader_config.source_id;
       m_socket_stats = reader_config.socket_stats;
 
-      const auto endpoint = reader_config.address
-                              ? boost::asio::ip::udp::endpoint(
-                                  boost::asio::ip::address::from_string(*reader_config.address), reader_config.port)
-                              : boost::asio::ip::udp::endpoint(boost::asio::ip::address_v4::any(), reader_config.port);
-      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, endpoint);
+      const auto receiver_endpoint = boost::asio::ip::udp::endpoint(
+                              boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port);
+      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, receiver_endpoint);
 
-      TLOG() << "Created UDP socket on " << (reader_config.address ? *reader_config.address : "0.0.0.0") << ":"
-                   << reader_config.port;
+      TLOG() << "Created UDP socket on " << reader_config.local_ip << ":" << reader_config.local_port;
     }
 
     /**
