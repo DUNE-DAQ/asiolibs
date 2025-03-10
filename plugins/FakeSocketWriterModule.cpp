@@ -10,19 +10,22 @@
 
 #include "CreateSource.hpp"
 
-#include "appmodel/SocketDataWriterModule.hpp"
-#include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/FakeSocketDataSender.hpp"
-#include "appmodel/SocketWriterConf.hpp"
+#include "appmodel/NWDetDataSender.hpp"
+#include "appmodel/SocketDataWriterModule.hpp"
 #include "appmodel/SocketReceiver.hpp"
+#include "appmodel/SocketWriterConf.hpp"
 #include "confmodel/DetectorStream.hpp"
 #include "confmodel/DetectorToDaqConnection.hpp"
-#include "confmodel/GeoId.hpp"
-#include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include "asiolibs/opmon/FakeSocketWriterModule.pb.h"
+
+#include <string>
+#include <memory>
+#include <vector>
+#include <utility>
 
 namespace dunedaq::asiolibs {
 
@@ -33,17 +36,6 @@ FakeSocketWriterModule::FakeSocketWriterModule(const std::string& name)
   register_command("conf", &FakeSocketWriterModule::do_configure);
   register_command("start", &FakeSocketWriterModule::do_start);
   register_command("stop_trigger_sources", &FakeSocketWriterModule::do_stop);
-}
-
-inline void
-tokenize(std::string const& str, const char delim, std::vector<std::string>& out)
-{
-  std::size_t start;
-  std::size_t end = 0;
-  while ((start = str.find_first_not_of(delim, end)) != std::string::npos) {
-    end = str.find(delim, start);
-    out.push_back(str.substr(start, end - start));
-  }
 }
 
 void
@@ -98,10 +90,10 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
       }
 
       if (nw_sender->get_contains().size() > 1) {
-        dunedaq::datahandlinglibs::GenericConfigurationError err(
-          ERS_HERE, "Multiple streams currently are not supported!");
+        dunedaq::datahandlinglibs::GenericConfigurationError err(ERS_HERE,
+                                                                 "Multiple streams currently are not supported!");
         ers::fatal(err);
-        throw err;        
+        throw err;
       }
 
       for (auto* res : nw_sender->get_contains()) {
@@ -114,45 +106,14 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
 
   m_writers.reserve(m_writer_configs.size());
   if (m_socket_type == SocketType::TCP) {
-    for(std::size_t i = 0; i < m_writer_configs.size(); ++i) {
+    for (std::size_t i = 0; i < m_writer_configs.size(); ++i) {
       m_writers.emplace_back(FakeTCPWriter());
-    }      
+    }
   } else {
-    for(std::size_t i = 0; i < m_writer_configs.size(); ++i) {
+    for (std::size_t i = 0; i < m_writer_configs.size(); ++i) {
       m_writers.emplace_back(FakeUDPWriter());
-    }        
+    }
   }
-
-  // if (mdal->get_outputs().empty()) {
-  //   auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
-  //                                                             "No outputs defined for socket writer in configuration.");
-  //   ers::fatal(err);
-  //   throw err;
-  // }
-
-  // for (auto* con : mdal->get_outputs()) {
-  //   auto* queue = con->cast<confmodel::QueueWithSourceId>();
-  //   if (queue == nullptr) {
-  //     auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
-  //     ers::fatal(err);
-  //     throw err;
-  //   }
-
-  //   // dte: not sure if I need this at all
-  //   // Check for CB prefix indicating Callback use
-  //   const char delim = '_';
-  //   const std::string target = queue->UID();
-  //   std::vector<std::string> words;
-  //   tokenize(target, delim, words);
-
-  //   bool callback_mode = false;
-  //   if (words.front() == "cb") {
-  //     callback_mode = true;
-  //   }
-
-  //   auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
-  //   register_node(queue->UID(), ptr);  
-  // }
 }
 
 FakeSocketWriterModule::SocketType
@@ -178,16 +139,11 @@ FakeSocketWriterModule::do_configure(const data_t&)
 void
 FakeSocketWriterModule::do_start(const data_t&)
 {
-  // Setup callbacks on all sourcemodels
-  for (auto& [sourceid, source] : m_sources) {
-    source->acquire_callback();
-  }
-
   m_io_thread = std::jthread([this] { m_io_context.run(); });
+
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
-      boost::asio::co_spawn(m_io_context,
-                            std::visit([this](auto& writer) { return writer.start(); }, m_writers[i]),
-                            boost::asio::detached);
+    boost::asio::co_spawn(
+      m_io_context, std::visit([this](auto& writer) { return writer.start(); }, m_writers[i]), boost::asio::detached);
   }
 }
 
@@ -197,17 +153,18 @@ FakeSocketWriterModule::do_stop(const data_t&)
   for (auto& writer : m_writers) {
     std::visit([](auto& writer) { writer.stop(); }, writer);
   }
-  
-  m_work_guard.reset();    
+
+  m_work_guard.reset();
 }
 
-void 
-FakeSocketWriterModule::generate_opmon_data() {
+void
+FakeSocketWriterModule::generate_opmon_data()
+{
   for (const auto& writer_config : m_writer_configs) {
     opmon::SocketWriterStats stats;
     stats.set_packets_sent(writer_config.socket_stats->packets_sent.load());
     stats.set_bytes_sent(writer_config.socket_stats->bytes_sent.load());
-    publish(std::move(stats), {{"socket-writer", std::to_string(writer_config.remote_port)}});  
+    publish(std::move(stats), { { "socket-writer", std::to_string(writer_config.remote_port) } });
   }
 }
 
