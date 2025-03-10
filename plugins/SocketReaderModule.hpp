@@ -17,6 +17,11 @@
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
 
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
 namespace dunedaq::asiolibs {
 
 using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
@@ -41,9 +46,9 @@ constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
 void
 handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id)
 {
-  //auto* frame = reinterpret_cast<fddetdataformats::WIBEthFrame*>(buffer); //dte remove
+  // auto* frame = reinterpret_cast<fddetdataformats::WIBEthFrame*>(buffer); //dte remove
   if (auto src_it = sources.find(source_id); src_it != sources.end()) {
-    //TLOG() << "sequence_id = " << frame->daq_header.seq_id; //dte remove
+    // TLOG() << "sequence_id = " << frame->daq_header.seq_id; //dte remove
     src_it->second->handle_payload(buffer, size);
   } else {
     TLOG() << "Unexpected StreamID in payload! (" << source_id << ")";
@@ -79,17 +84,18 @@ private:
     INVALID
   };
 
-  struct SocketStats {
+  struct SocketStats
+  {
     /**
      * @brief Received packets
-     */  
+     */
     std::atomic<uint64_t> packets_received{ 0 };
 
     /**
      * @brief Received bytes
-     */  
+     */
     std::atomic<uint64_t> bytes_received{ 0 };
-  };  
+  };
 
   struct ReaderConfig
   {
@@ -110,8 +116,8 @@ private:
 
     /**
      * @brief Statistics of socket traffic
-     */  
-    std::shared_ptr<SocketStats> socket_stats;    
+     */
+    std::shared_ptr<SocketStats> socket_stats;
   };
 
   class TCPReader
@@ -130,14 +136,17 @@ private:
 
       m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);
 
-      boost::asio::ip::tcp::acceptor acceptor(io_context,
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port));
+      boost::asio::ip::tcp::acceptor acceptor(
+        io_context,
+        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(reader_config.local_ip),
+                                       reader_config.local_port));
 
       TLOG() << "Waiting for TCP connection at " << reader_config.local_ip << ":" << reader_config.local_port;
 
       acceptor.accept(*m_socket);
 
-      TLOG() << "Established TCP connection from " << m_socket->remote_endpoint().address() << ":" << m_socket->remote_endpoint().port();
+      TLOG() << "Established TCP connection from " << m_socket->remote_endpoint().address() << ":"
+             << m_socket->remote_endpoint().port();
     }
 
     /**
@@ -184,7 +193,7 @@ private:
 
     /**
      * @brief Statistics of socket traffic
-     */      
+     */
     std::shared_ptr<SocketStats> m_socket_stats;
   };
 
@@ -202,7 +211,7 @@ private:
       m_socket_stats = reader_config.socket_stats;
 
       const auto receiver_endpoint = boost::asio::ip::udp::endpoint(
-                              boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port);
+        boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port);
       m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, receiver_endpoint);
 
       TLOG() << "Created UDP socket on " << reader_config.local_ip << ":" << reader_config.local_port;
@@ -223,13 +232,12 @@ private:
           boost::asio::buffer(buffer), sender_endpoint, boost::asio::use_awaitable);
 
         ++m_socket_stats->packets_received;
-        m_socket_stats->bytes_received.fetch_add(bytes_received);          
+        m_socket_stats->bytes_received.fetch_add(bytes_received);
 
         if (bytes_received > min_expected_payload_size) [[likely]] { // RS FIXME: do proper check on data length later
           handle_eth_payload(sources, buffer.data(), bytes_received, m_source_id);
         } else {
           TLOG() << "Payload is smaller than " << min_expected_payload_size << " (" << bytes_received << ")";
-          
         }
       }
     }
@@ -256,8 +264,8 @@ private:
 
     /**
      * @brief Statistics of socket traffic
-     */      
-    std::shared_ptr<SocketStats> m_socket_stats;    
+     */
+    std::shared_ptr<SocketStats> m_socket_stats;
   };
 
   // Commands
@@ -302,7 +310,7 @@ private:
   /**
    * @brief Socket reader configurations
    */
-  std::vector<ReaderConfig> m_reader_configs;  
+  std::vector<ReaderConfig> m_reader_configs;
 
   // Internals
   /**
@@ -315,7 +323,6 @@ private:
    * @brief Data sources
    */
   sid_to_source_map_t m_sources;
-
 };
 
 } // namespace dunedaq::asiolibs

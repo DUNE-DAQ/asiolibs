@@ -11,8 +11,8 @@
 #include "CreateSource.hpp"
 
 #include "appmodel/DataReaderModule.hpp"
-#include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/FakeSocketDataSender.hpp"
+#include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/SocketReaderConf.hpp"
 #include "appmodel/SocketReceiver.hpp"
 #include "confmodel/DetectorStream.hpp"
@@ -23,6 +23,11 @@
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include "asiolibs/opmon/SocketReaderModule.pb.h"
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <utility>
 
 namespace dunedaq::asiolibs {
 
@@ -52,7 +57,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
   m_cfg = mcfg;
   auto* mdal = m_cfg->module<appmodel::DataReaderModule>(get_name());
   auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketReaderConf>();
-  
+
   const auto local_ip = module_conf->get_local_ip();
 
   m_socket_type = string_to_socket_type(module_conf->get_socket_type());
@@ -98,29 +103,30 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
       }
 
       if (nw_sender->get_contains().size() > 1) {
-        dunedaq::datahandlinglibs::GenericConfigurationError err(
-          ERS_HERE, "Multiple streams currently are not supported!");
+        dunedaq::datahandlinglibs::GenericConfigurationError err(ERS_HERE,
+                                                                 "Multiple streams currently are not supported!");
         ers::fatal(err);
-        throw err;        
+        throw err;
       }
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
         const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
-        m_reader_configs.emplace_back(local_ip, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
+        m_reader_configs.emplace_back(
+          local_ip, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
       }
     }
   }
 
   m_readers.reserve(m_reader_configs.size());
   if (m_socket_type == SocketType::TCP) {
-    for(std::size_t i = 0; i < m_reader_configs.size(); ++i) {
+    for (std::size_t i = 0; i < m_reader_configs.size(); ++i) {
       m_readers.emplace_back(TCPReader());
-    }      
+    }
   } else {
-    for(std::size_t i = 0; i < m_reader_configs.size(); ++i) {
+    for (std::size_t i = 0; i < m_reader_configs.size(); ++i) {
       m_readers.emplace_back(UDPReader());
-    }        
+    }
   }
 
   if (mdal->get_outputs().empty()) {
@@ -201,13 +207,14 @@ SocketReaderModule::do_stop(const data_t&)
   m_work_guard.reset();
 }
 
-void 
-SocketReaderModule::generate_opmon_data() {
+void
+SocketReaderModule::generate_opmon_data()
+{
   for (const auto& reader_config : m_reader_configs) {
     opmon::SocketReaderStats stats;
     stats.set_packets_received(reader_config.socket_stats->packets_received.load());
     stats.set_bytes_received(reader_config.socket_stats->bytes_received.load());
-    publish(std::move(stats), {{"socket-reader", std::to_string(reader_config.local_port)}});  
+    publish(std::move(stats), { { "socket-reader", std::to_string(reader_config.local_port) } });
   }
 }
 
