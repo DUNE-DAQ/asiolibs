@@ -46,9 +46,7 @@ constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
 void
 handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id)
 {
-  // auto* frame = reinterpret_cast<fddetdataformats::WIBEthFrame*>(buffer); //dte remove
   if (auto src_it = sources.find(source_id); src_it != sources.end()) {
-    // TLOG() << "sequence_id = " << frame->daq_header.seq_id; //dte remove
     src_it->second->handle_payload(buffer, size);
   } else {
     TLOG() << "Unexpected StreamID in payload! (" << source_id << ")";
