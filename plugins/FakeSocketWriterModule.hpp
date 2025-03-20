@@ -15,6 +15,7 @@
 #include "datahandlinglibs/utils/RateLimiter.hpp"
 
 #include "fddetdataformats/WIBEthFrame.hpp"
+#include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
 
 #include <boost/asio.hpp>
 
@@ -57,7 +58,10 @@ constexpr uint64_t fake_block_length = 0x382;
 /**
  * @brief Packet transmission rate in kHz
  */
-constexpr double packet_rate_khz = 30.5;
+//constexpr double packet_rate_khz = 30.5;
+
+constexpr int wibeth_time_tick_diff = fdreadoutlibs::types::DUNEWIBEthTypeAdapter::expected_tick_difference;
+constexpr double wibeth_rate_khz = 62500./wibeth_time_tick_diff;
 
 /**
  * @brief Calculate the next fake sequence ID for a packet
@@ -91,6 +95,8 @@ void
 fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp)
 {
   frame.daq_header.det_id = fake_det_id;
+  frame.daq_header.crate_id = 1;
+  frame.daq_header.slot_id = 1;
   frame.daq_header.stream_id = fake_stream_id;
   fake_sequence_id(seq_id);
   frame.daq_header.seq_id = seq_id;
@@ -201,7 +207,7 @@ private:
       uint64_t seq_id = 0;
       uint64_t timestamp = 0;
 
-      datahandlinglibs::RateLimiter rate_limiter(packet_rate_khz);
+      datahandlinglibs::RateLimiter rate_limiter(wibeth_rate_khz);
 
       while (m_socket->is_open()) {
         fake_data(frame, seq_id, timestamp);
@@ -272,7 +278,7 @@ private:
       uint64_t seq_id = 0;
       uint64_t timestamp = 0;
 
-      datahandlinglibs::RateLimiter rate_limiter(packet_rate_khz);
+      datahandlinglibs::RateLimiter rate_limiter(wibeth_rate_khz);
 
       while (m_socket->is_open()) {
         fake_data(frame, seq_id, timestamp);
