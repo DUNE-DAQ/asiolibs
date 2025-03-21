@@ -52,10 +52,10 @@ tokenize(std::string const& str, const char delim, std::vector<std::string>& out
 }
 
 void
-SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
+SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
   m_cfg = mcfg;
-  auto* mdal = m_cfg->module<appmodel::DataReaderModule>(get_name());
+  auto* mdal = m_cfg->get_dal<appmodel::DataReaderModule>(get_name());
   auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketReaderConf>();
 
   const auto local_ip = module_conf->get_local_ip();
@@ -76,7 +76,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
       throw err;
     }
 
-    if (connection->disabled(*(m_cfg->configuration_manager()->session()))) {
+    if (connection->disabled(*(m_cfg->session()))) {
       continue;
     }
 
@@ -98,7 +98,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg
                       d2d_conn->UID()));
       }
 
-      if (nw_sender->disabled(*(m_cfg->configuration_manager()->session()))) {
+      if (nw_sender->disabled(*(m_cfg->session()))) {
         continue;
       }
 

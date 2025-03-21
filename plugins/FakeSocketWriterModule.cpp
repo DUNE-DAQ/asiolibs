@@ -39,10 +39,10 @@ FakeSocketWriterModule::FakeSocketWriterModule(const std::string& name)
 }
 
 void
-FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
+FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
   m_cfg = mcfg;
-  auto* mdal = m_cfg->module<appmodel::SocketDataWriterModule>(get_name());
+  auto* mdal = m_cfg->get_dal<appmodel::SocketDataWriterModule>(get_name());
   auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketWriterConf>();
 
   const auto remote_ip = module_conf->get_remote_ip();
@@ -63,7 +63,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
       throw err;
     }
 
-    if (connection->disabled(*(m_cfg->configuration_manager()->session()))) {
+    if (connection->disabled(*(m_cfg->session()))) {
       continue;
     }
 
@@ -85,7 +85,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ModuleConfiguration> 
                       d2d_conn->UID()));
       }
 
-      if (nw_sender->disabled(*(m_cfg->configuration_manager()->session()))) {
+      if (nw_sender->disabled(*(m_cfg->session()))) {
         continue;
       }
 
