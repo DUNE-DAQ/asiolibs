@@ -11,6 +11,7 @@
 #include "SourceConcept.hpp"
 
 #include "appfwk/DAQModule.hpp"
+#include "appfwk/ConfigurationManager.hpp"
 
 #include "datahandlinglibs/utils/RateLimiter.hpp"
 
@@ -126,7 +127,7 @@ public:
    * @brief Handles initialization on boot
    * @param mcfg DAQ configuration data
    */
-  void init(const std::shared_ptr<appfwk::ModuleConfiguration> mcfg) override;
+  void init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg) override;
 
 private:
   enum class SocketType
@@ -362,7 +363,7 @@ private:
   /**
    * @brief DAQ configuration data
    */
-  std::shared_ptr<appfwk::ModuleConfiguration> m_cfg;
+  std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
 };
 
 } // namespace dunedaq::asiolibs
