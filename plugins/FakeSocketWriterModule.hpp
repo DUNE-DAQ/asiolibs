@@ -81,9 +81,35 @@ fake_sequence_id(uint64_t& seq_id)
 void
 fake_timestamp(uint64_t& timestamp)
 {
-  if (timestamp != 0) {
+  static bool first_packet = true;
+  if (first_packet) {
+    first_packet = false;
+    auto time_now = std::chrono::system_clock::now().time_since_epoch();
+    uint64_t current_time = // NOLINT (build/unsigned)
+      std::chrono::duration_cast<std::chrono::microseconds>(time_now).count();
+    // FIXME: where do I get the clockspeed from?
+    // ts_0 = (m_conf.clock_speed_hz / 100000) * current_time;
+    timestamp = 625 * current_time / 10;    
+  } else {
     timestamp += timestamp_diff;
   }
+}
+
+/**
+ * @brief 
+ */
+void
+fake_adc(fddetdataformats::WIBEthFrame& frame)
+{
+  for (int time = 0; time < 64; ++time) {
+    for (int channel = 0; channel < 64; ++channel) {
+      frame.set_adc(channel, time, 0); 
+    }
+    if (time != 0) {
+      frame.set_adc(0, time, 666);
+    }
+  }
+  
 }
 
 /**
@@ -104,6 +130,7 @@ fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& time
   frame.daq_header.block_length = fake_block_length;
   fake_timestamp(timestamp);
   frame.daq_header.timestamp = timestamp;
+  fake_adc(frame);
 }
 
 class FakeSocketWriterModule : public dunedaq::appfwk::DAQModule
@@ -283,7 +310,7 @@ private:
 
       while (m_socket->is_open()) {
         fake_data(frame, seq_id, timestamp);
-
+        
         const auto bytes_sent = co_await m_socket->async_send_to(
           boost::asio::buffer(&frame, buffer_size), receiver_endpoint, boost::asio::use_awaitable);
 
