@@ -43,15 +43,7 @@ constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
  * @param size Payload size
  * @param source_id Detector stream source ID
  */
-void
-handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id)
-{
-  if (auto src_it = sources.find(source_id); src_it != sources.end()) {
-    src_it->second->handle_payload(buffer, size);
-  } else {
-    TLOG() << "Unexpected StreamID in payload! (" << source_id << ")";
-  }
-}
+void handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id);
 
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
@@ -127,56 +119,19 @@ private:
      * @param reader_config TCP reader configuration
      * @throws boost::system::system_error on failure
      */
-    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config)
-    {
-      m_source_id = reader_config.source_id;
-      m_socket_stats = reader_config.socket_stats;
-
-      m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);
-
-      boost::asio::ip::tcp::acceptor acceptor(
-        io_context,
-        boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(reader_config.local_ip),
-                                       reader_config.local_port));
-
-      TLOG() << "Waiting for TCP connection at " << reader_config.local_ip << ":" << reader_config.local_port;
-
-      acceptor.accept(*m_socket);
-
-      TLOG() << "Established TCP connection from " << m_socket->remote_endpoint().address() << ":"
-             << m_socket->remote_endpoint().port();
-    }
+    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
      * @brief Asynchronously reads data from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources)
-    {
-      boost::array<char, buffer_size> buffer;
-
-      while (m_socket->is_open()) {
-        const auto bytes_received =
-          co_await boost::asio::async_read(*m_socket,
-                                           boost::asio::buffer(buffer),
-                                           boost::asio::transfer_at_least(min_expected_payload_size),
-                                           boost::asio::use_awaitable);
-        ++m_socket_stats->packets_received;
-        m_socket_stats->bytes_received.fetch_add(bytes_received);
-        handle_eth_payload(sources, buffer.data(), bytes_received, m_source_id);
-      }
-    }
+    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources);
 
     /**
      * @brief Closes the socket
      */
-    void stop()
-    {
-      m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-      m_socket->close();
-      TLOG() << "Shutdown TCP connection";
-    }
+    void stop();
 
   private:
     /**
@@ -203,51 +158,19 @@ private:
      * @param io_context I/O context for socket creation
      * @param reader_config UDP reader configuration
      */
-    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config)
-    {
-      m_source_id = reader_config.source_id;
-      m_socket_stats = reader_config.socket_stats;
-
-      const auto receiver_endpoint = boost::asio::ip::udp::endpoint(
-        boost::asio::ip::address::from_string(reader_config.local_ip), reader_config.local_port);
-      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, receiver_endpoint);
-
-      TLOG() << "Created UDP socket on " << reader_config.local_ip << ":" << reader_config.local_port;
-    }
+    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
      * @brief Asynchronously reads data from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources)
-    {
-      boost::array<char, buffer_size> buffer;
-      boost::asio::ip::udp::endpoint sender_endpoint;
-
-      while (m_socket->is_open()) {
-        std::size_t bytes_received = co_await m_socket->async_receive_from(
-          boost::asio::buffer(buffer), sender_endpoint, boost::asio::use_awaitable);
-
-        ++m_socket_stats->packets_received;
-        m_socket_stats->bytes_received.fetch_add(bytes_received);
-
-        if (bytes_received > min_expected_payload_size) [[likely]] { // RS FIXME: do proper check on data length later
-          handle_eth_payload(sources, buffer.data(), bytes_received, m_source_id);
-        } else {
-          TLOG() << "Payload is smaller than " << min_expected_payload_size << " (" << bytes_received << ")";
-        }
-      }
-    }
+    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources);
 
     /**
      * @brief Closes the socket
      */
-    void stop()
-    {
-      m_socket->close();
-      TLOG() << "Closed UDP socket";
-    }
+    void stop();
 
   private:
     /**
