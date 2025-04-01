@@ -59,58 +59,25 @@ constexpr uint64_t fake_block_length = 0x382;
 /**
  * @brief Packet transmission rate in kHz
  */
-//constexpr double packet_rate_khz = 30.5;
-
-constexpr int wibeth_time_tick_diff = fdreadoutlibs::types::DUNEWIBEthTypeAdapter::expected_tick_difference;
-constexpr double wibeth_rate_khz = 62500./wibeth_time_tick_diff;
+constexpr double packet_rate_khz = 1;
 
 /**
  * @brief Calculate the next fake sequence ID for a packet
  * @param seq_id Fake packet sequence ID
  */
-void
-fake_sequence_id(uint64_t& seq_id)
-{
-  seq_id = seq_id == max_seq_id ? 0 : ++seq_id;
-}
+void fake_sequence_id(uint64_t& seq_id);
 
 /**
  * @brief Calculate the next fake timestamp for a packet
  * @param timestamp Fake packet timestamp
  */
-void
-fake_timestamp(uint64_t& timestamp)
-{
-  static bool first_packet = true;
-  if (first_packet) {
-    first_packet = false;
-    auto time_now = std::chrono::system_clock::now().time_since_epoch();
-    uint64_t current_time = // NOLINT (build/unsigned)
-      std::chrono::duration_cast<std::chrono::microseconds>(time_now).count();
-    // FIXME: where do I get the clockspeed from?
-    // ts_0 = (m_conf.clock_speed_hz / 100000) * current_time;
-    timestamp = 625 * current_time / 10;    
-  } else {
-    timestamp += timestamp_diff;
-  }
-}
+void fake_timestamp(uint64_t& timestamp);
 
 /**
- * @brief 
+ * @brief Fake ADC of the given packet
+ * @param frame Fake packet
  */
-void
-fake_adc(fddetdataformats::WIBEthFrame& frame)
-{
-  for (int time = 0; time < 64; ++time) {
-    for (int channel = 0; channel < 64; ++channel) {
-      frame.set_adc(channel, time, 0); 
-    }
-    if (time != 0) {
-      frame.set_adc(0, time, 666);
-    }
-  }
-  
-}
+void fake_adc(fddetdataformats::WIBEthFrame& frame);
 
 /**
  * @brief Create a fake packet
@@ -118,20 +85,7 @@ fake_adc(fddetdataformats::WIBEthFrame& frame)
  * @param seq_id Fake packet sequence ID
  * @param timestamp Fake packet timestamp
  */
-void
-fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp)
-{
-  frame.daq_header.det_id = fake_det_id;
-  frame.daq_header.crate_id = 1;
-  frame.daq_header.slot_id = 1;
-  frame.daq_header.stream_id = fake_stream_id;
-  fake_sequence_id(seq_id);
-  frame.daq_header.seq_id = seq_id;
-  frame.daq_header.block_length = fake_block_length;
-  fake_timestamp(timestamp);
-  frame.daq_header.timestamp = timestamp;
-  fake_adc(frame);
-}
+void fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp);
 
 class FakeSocketWriterModule : public dunedaq::appfwk::DAQModule
 {
@@ -204,61 +158,19 @@ private:
      * @param writer_config TCP writer configuration
      * @throws boost::system::system_error on failure
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
-    {
-      m_socket_stats = writer_config.socket_stats;
-
-      while (true) {
-        try {
-          m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);
-
-          m_socket->connect(boost::asio::ip::tcp::endpoint(
-            boost::asio::ip::address::from_string(writer_config.remote_ip), writer_config.remote_port));
-          break;
-        } catch (const boost::system::system_error& e) {
-          TLOG() << "Connection failed: " << e.what() << ". Retrying in 1 second...";
-          std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-      }
-
-      TLOG() << "Established TCP connection to " << writer_config.remote_ip << ":" << writer_config.remote_port;
-    }
+    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
 
     /**
      * @brief Asynchronously reads data from the socket in a loop
      * @param writer_config TCP writer configuration
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start()
-    {
-      fddetdataformats::WIBEthFrame frame;
-      uint64_t seq_id = 0;
-      uint64_t timestamp = 0;
-
-      datahandlinglibs::RateLimiter rate_limiter(wibeth_rate_khz);
-
-      while (m_socket->is_open()) {
-        fake_data(frame, seq_id, timestamp);
-
-        const auto bytes_sent =
-          co_await m_socket->async_send(boost::asio::buffer(&frame, buffer_size), boost::asio::use_awaitable);
-
-        ++m_socket_stats->packets_sent;
-        m_socket_stats->bytes_sent.fetch_add(bytes_sent);
-
-        rate_limiter.limit();
-      }
-    }
+    boost::asio::awaitable<void> start();
 
     /**
      * @brief Closes the socket
      */
-    void stop()
-    {
-      m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-      m_socket->close();
-      TLOG() << "Shutdown TCP connection";
-    }
+    void stop();
 
   private:
     /**
@@ -280,55 +192,18 @@ private:
      * @param io_context I/O context for socket creation
      * @param writer_config UDP writer configuration
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
-    {
-      m_writer_config = writer_config;
-
-      // Let the OS pick an available local IP and port for sending packets
-      const boost::asio::ip::udp::endpoint sender_endpoint(boost::asio::ip::udp::v4(), 0);
-
-      m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, sender_endpoint);
-
-      TLOG() << "Created UDP socket on " << m_socket->local_endpoint().address() << ":"
-             << m_socket->local_endpoint().port();
-    }
+    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
 
     /**
      * @brief Asynchronously writes data to the socket in a loop
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start()
-    {
-      boost::asio::ip::udp::endpoint receiver_endpoint(boost::asio::ip::address::from_string(m_writer_config.remote_ip),
-                                                       m_writer_config.remote_port);
-
-      fddetdataformats::WIBEthFrame frame;
-      uint64_t seq_id = 0;
-      uint64_t timestamp = 0;
-
-      datahandlinglibs::RateLimiter rate_limiter(wibeth_rate_khz);
-
-      while (m_socket->is_open()) {
-        fake_data(frame, seq_id, timestamp);
-        
-        const auto bytes_sent = co_await m_socket->async_send_to(
-          boost::asio::buffer(&frame, buffer_size), receiver_endpoint, boost::asio::use_awaitable);
-
-        ++m_writer_config.socket_stats->packets_sent;
-        m_writer_config.socket_stats->bytes_sent.fetch_add(bytes_sent);
-
-        rate_limiter.limit();
-      }
-    }
+    boost::asio::awaitable<void> start();
 
     /**
      * @brief Closes the socket
      */
-    void stop()
-    {
-      m_socket->close();
-      TLOG() << "Closed UDP socket";
-    }
+    void stop();
 
   private:
     /**
