@@ -31,6 +31,16 @@
 
 namespace dunedaq::asiolibs {
 
+/**
+ * @brief Minimum valid payload size in bytes
+ */
+constexpr int min_expected_payload_size = 7000;
+
+/**
+ * @brief Buffer size based on WIBEthFrame
+ */
+constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
+  
 void
 handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id)
 {

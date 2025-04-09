@@ -27,16 +27,6 @@ namespace dunedaq::asiolibs {
 using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
 
 /**
- * @brief Minimum valid payload size in bytes
- */
-constexpr int min_expected_payload_size = 7000;
-
-/**
- * @brief Buffer size based on WIBEthFrame
- */
-constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
-
-/**
  * @brief Forwards the payload to get processed
  * @param sources Data sources
  * @param buffer Payload buffer

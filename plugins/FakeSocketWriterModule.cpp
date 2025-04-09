@@ -29,6 +29,41 @@
 
 namespace dunedaq::asiolibs {
 
+/**
+ * @brief Buffer size based on WIBEthFrame
+ */
+constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
+
+/**
+ * @brief Maximum packet sequence ID before reset
+ */
+constexpr uint64_t max_seq_id = 4095;
+
+/**
+ * @brief Timestamp difference between packets
+ */
+constexpr uint64_t timestamp_diff = 32 * 64;
+
+/**
+ * @brief Fake packet detector ID
+ */
+constexpr uint64_t fake_det_id = 3;
+
+/**
+ * @brief Fake packet stream ID
+ */
+constexpr uint64_t fake_stream_id = 0;
+
+/**
+ * @brief Fake packet block length
+ */
+constexpr uint64_t fake_block_length = 0x382;
+
+/**
+ * @brief Packet transmission rate in kHz
+ */
+constexpr double packet_rate_khz = 1;
+  
 void
 fake_sequence_id(uint64_t& seq_id)
 {
