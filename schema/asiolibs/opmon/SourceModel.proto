@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package dunedaq.asiolibs.opmon;
-
-message SourceInfo {
-
-  uint32 dropped_frames = 1;
-  
-}
