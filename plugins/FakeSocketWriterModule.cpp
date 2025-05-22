@@ -8,8 +8,9 @@
 
 #include "FakeSocketWriterModule.hpp"
 
-#include "CreateSource.hpp"
+#include "CreateFrameBuilder.hpp"
 
+#include "appfwk/ConfigurationManager.hpp"
 #include "appmodel/FakeSocketDataSender.hpp"
 #include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/SocketDataWriterModule.hpp"
@@ -17,8 +18,10 @@
 #include "appmodel/SocketWriterConf.hpp"
 #include "confmodel/DetectorStream.hpp"
 #include "confmodel/DetectorToDaqConnection.hpp"
+#include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
+#include "datahandlinglibs/utils/RateLimiter.hpp"
 
 #include "asiolibs/opmon/FakeSocketWriterModule.pb.h"
 
@@ -30,90 +33,9 @@
 namespace dunedaq::asiolibs {
 
 /**
- * @brief Buffer size based on WIBEthFrame
- */
-constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
-
-/**
- * @brief Maximum packet sequence ID before reset
- */
-constexpr uint64_t max_seq_id = 4095;
-
-/**
- * @brief Timestamp difference between packets
- */
-constexpr uint64_t timestamp_diff = 32 * 64;
-
-/**
- * @brief Fake packet detector ID
- */
-constexpr uint64_t fake_det_id = 3;
-
-/**
- * @brief Fake packet stream ID
- */
-constexpr uint64_t fake_stream_id = 0;
-
-/**
- * @brief Fake packet block length
- */
-constexpr uint64_t fake_block_length = 0x382;
-
-/**
  * @brief Packet transmission rate in kHz
  */
 constexpr double packet_rate_khz = 1;
-  
-void
-fake_sequence_id(uint64_t& seq_id)
-{
-  seq_id = seq_id == max_seq_id ? 0 : ++seq_id;
-}
-
-void
-fake_timestamp(uint64_t& timestamp)
-{
-  static bool first_packet = true;
-  if (first_packet) {
-    first_packet = false;
-    auto time_now = std::chrono::system_clock::now().time_since_epoch();
-    uint64_t current_time = // NOLINT (build/unsigned)
-      std::chrono::duration_cast<std::chrono::microseconds>(time_now).count();
-    // FIXME: where do I get the clockspeed from?
-    // ts_0 = (m_conf.clock_speed_hz / 100000) * current_time;
-    timestamp = 625 * current_time / 10;    
-  } else {
-    timestamp += timestamp_diff;
-  }
-}
-
-void
-fake_adc(fddetdataformats::WIBEthFrame& frame)
-{
-  for (int time = 0; time < 64; ++time) {
-    for (int channel = 0; channel < 64; ++channel) {
-      frame.set_adc(channel, time, 0); 
-    }
-    if (time != 0) {
-      frame.set_adc(0, time, 666);
-    }
-  }
-}
-
-void
-fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp)
-{
-  frame.daq_header.det_id = fake_det_id;
-  frame.daq_header.crate_id = 1;
-  frame.daq_header.slot_id = 1;
-  frame.daq_header.stream_id = fake_stream_id;
-  fake_sequence_id(seq_id);
-  frame.daq_header.seq_id = seq_id;
-  frame.daq_header.block_length = fake_block_length;
-  fake_timestamp(timestamp);
-  frame.daq_header.timestamp = timestamp;
-  fake_adc(frame);
-}
 
 FakeSocketWriterModule::FakeSocketWriterModule(const std::string& name)
   : DAQModule(name)
@@ -186,7 +108,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
         auto* det_stream = res->cast<confmodel::DetectorStream>();
         const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
         m_writer_configs.emplace_back(remote_ip, socket_sender->get_port(), std::make_shared<SocketStats>());
-      }
+      } 
     }
   }
 
@@ -200,6 +122,24 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
       m_writers.emplace_back(FakeUDPWriter());
     }
   }
+
+  if (mdal->get_outputs().empty()) {
+    auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
+                                                              "No outputs defined for socket reader in configuration.");
+    ers::fatal(err);
+    throw err;
+  }
+
+  for (auto* con : mdal->get_outputs()) {
+    auto* queue = con->cast<confmodel::QueueWithSourceId>();
+    if (queue == nullptr) {
+      auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
+      ers::fatal(err);
+      throw err;
+    }  
+
+    m_frame_builder = createFrameBuilder(queue->UID()); // FIXME (DTE): Overwriting doesn't make sense
+  }       
 }
 
 FakeSocketWriterModule::SocketType
@@ -229,7 +169,7 @@ FakeSocketWriterModule::do_start(const data_t&)
 
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
     boost::asio::co_spawn(
-      m_io_context, std::visit([this](auto& writer) { return writer.start(); }, m_writers[i]), boost::asio::detached);
+      m_io_context, std::visit([this](auto& writer) { return writer.start(m_frame_builder); }, m_writers[i]), boost::asio::detached);
   }
 }
 
@@ -276,19 +216,15 @@ FakeSocketWriterModule::FakeTCPWriter::configure(boost::asio::io_context& io_con
 }
 
 boost::asio::awaitable<void>
-FakeSocketWriterModule::FakeTCPWriter::start()
+FakeSocketWriterModule::FakeTCPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
 {
-  fddetdataformats::WIBEthFrame frame;
-  uint64_t seq_id = 0;
-  uint64_t timestamp = 0;
-
   datahandlinglibs::RateLimiter rate_limiter(packet_rate_khz);
 
   while (m_socket->is_open()) {
-    fake_data(frame, seq_id, timestamp);
+    const auto [buffer, buffer_size]= frame_builder->build_frame();
 
     const auto bytes_sent =
-      co_await m_socket->async_send(boost::asio::buffer(&frame, buffer_size), boost::asio::use_awaitable);
+      co_await m_socket->async_send(boost::asio::buffer(buffer, buffer_size), boost::asio::use_awaitable);
 
     ++m_socket_stats->packets_sent;
     m_socket_stats->bytes_sent.fetch_add(bytes_sent);
@@ -320,22 +256,18 @@ FakeSocketWriterModule::FakeUDPWriter::configure(boost::asio::io_context& io_con
 }
 
 boost::asio::awaitable<void>
-FakeSocketWriterModule::FakeUDPWriter::start()
+FakeSocketWriterModule::FakeUDPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
 {
   boost::asio::ip::udp::endpoint receiver_endpoint(boost::asio::ip::address::from_string(m_writer_config.remote_ip),
                                                    m_writer_config.remote_port);
 
-  fddetdataformats::WIBEthFrame frame;
-  uint64_t seq_id = 0;
-  uint64_t timestamp = 0;
-
   datahandlinglibs::RateLimiter rate_limiter(packet_rate_khz);
 
   while (m_socket->is_open()) {
-    fake_data(frame, seq_id, timestamp);
+    const auto [buffer, buffer_size]= frame_builder->build_frame();
     
     const auto bytes_sent = co_await m_socket->async_send_to(
-      boost::asio::buffer(&frame, buffer_size), receiver_endpoint, boost::asio::use_awaitable);
+      boost::asio::buffer(buffer, buffer_size), receiver_endpoint, boost::asio::use_awaitable);
 
     ++m_writer_config.socket_stats->packets_sent;
     m_writer_config.socket_stats->bytes_sent.fetch_add(bytes_sent);

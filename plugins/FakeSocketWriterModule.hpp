@@ -8,15 +8,7 @@
 #ifndef ASIOLIBS_PLUGINS_FAKESOCKETWRITERMODULE_HPP_
 #define ASIOLIBS_PLUGINS_FAKESOCKETWRITERMODULE_HPP_
 
-#include "SourceConcept.hpp"
-
 #include "appfwk/DAQModule.hpp"
-#include "appfwk/ConfigurationManager.hpp"
-
-#include "datahandlinglibs/utils/RateLimiter.hpp"
-
-#include "fddetdataformats/WIBEthFrame.hpp"
-#include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
 
 #include <boost/asio.hpp>
 
@@ -26,32 +18,8 @@
 
 namespace dunedaq::asiolibs {
 
-/**
- * @brief Calculate the next fake sequence ID for a packet
- * @param seq_id Fake packet sequence ID
- */
-void fake_sequence_id(uint64_t& seq_id);
-
-/**
- * @brief Calculate the next fake timestamp for a packet
- * @param timestamp Fake packet timestamp
- */
-void fake_timestamp(uint64_t& timestamp);
-
-/**
- * @brief Fake ADC of the given packet
- * @param frame Fake packet
- */
-void fake_adc(fddetdataformats::WIBEthFrame& frame);
-
-/**
- * @brief Create a fake packet
- * @param frame Fake packet
- * @param seq_id Fake packet sequence ID
- * @param timestamp Fake packet timestamp
- */
-void fake_data(fddetdataformats::WIBEthFrame& frame, uint64_t& seq_id, uint64_t& timestamp);
-
+class FrameBuilder;
+class ConfigurationManager;
 class FakeSocketWriterModule : public dunedaq::appfwk::DAQModule
 {
 public:
@@ -126,11 +94,11 @@ private:
     void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
 
     /**
-     * @brief Asynchronously reads data from the socket in a loop
-     * @param writer_config TCP writer configuration
+     * @brief Asynchronously sends frames to the socket in a loop
+     * @param frame_builder Builds frames to be sent
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start();
+    boost::asio::awaitable<void> start(std::shared_ptr<FrameBuilder> frame_builder);
 
     /**
      * @brief Closes the socket
@@ -160,10 +128,11 @@ private:
     void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
 
     /**
-     * @brief Asynchronously writes data to the socket in a loop
+     * @brief Asynchronously sends frames to the socket in a loop
+     * @param frame_builder Builds frames to be sent
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start();
+    boost::asio::awaitable<void> start(std::shared_ptr<FrameBuilder> frame_builder);
 
     /**
      * @brief Closes the socket
@@ -226,7 +195,11 @@ private:
    */
   std::vector<WriterConfig> m_writer_configs;
 
-  // Internals
+  /**
+   * @brief Builds frames to be sent
+   */  
+  std::shared_ptr<FrameBuilder> m_frame_builder;
+
   /**
    * @brief DAQ configuration data
    */

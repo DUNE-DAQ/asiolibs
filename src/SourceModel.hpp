@@ -41,6 +41,11 @@ public:
   using data_t = nlohmann::json;
 
   /**
+   * @brief Buffer size based on TargetPayloadType
+   */
+  static constexpr auto buffer_size = sizeof(TargetPayloadType);
+
+  /**
    * @brief SourceModel Constructor
    * @param name Instance name for this SourceModel instance
    */
@@ -109,6 +114,10 @@ public:
     return true;
   }
 
+  std::size_t get_buffer_size() const override {
+    return buffer_size;
+  }
+    
   void generate_opmon_data() override {
 
     opmon::SourceInfo info;

@@ -45,6 +45,7 @@ namespace dunedaq {
       //  virtual void stop(const nlohmann::json& args) = 0;
 
       virtual bool handle_payload(char* message, std::size_t size) = 0;
+      virtual std::size_t get_buffer_size() const = 0;
 
       void set_sink_name(const std::string& sink_name) 
       { 
