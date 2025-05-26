@@ -25,6 +25,6 @@ daq_add_library(*.cpp LINK_LIBRARIES ${DUNEDAQ_DEPENDENCIES})
 ##############################################################################
 # Plugins
 daq_add_plugin(SocketReaderModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
-daq_add_plugin(FakeSocketWriterModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
+daq_add_plugin(SocketWriterModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
 
 daq_install()

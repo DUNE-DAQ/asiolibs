@@ -1,17 +1,17 @@
 /**
- * @file FakeSocketWriterModule.cpp Boost.Asio-based fake socket writer plugin for low-bandwidth devices
+ * @file SocketWriterModule.cpp Boost.Asio-based socket writer plugin for low-bandwidth devices
  *
  * This is part of the DUNE DAQ , copyright 2020.
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
 
-#include "FakeSocketWriterModule.hpp"
+#include "SocketWriterModule.hpp"
 
 #include "CreateFrameBuilder.hpp"
 
 #include "appfwk/ConfigurationManager.hpp"
-#include "appmodel/FakeSocketDataSender.hpp"
+#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/SocketDataWriterModule.hpp"
 #include "appmodel/SocketReceiver.hpp"
@@ -23,7 +23,7 @@
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 #include "datahandlinglibs/utils/RateLimiter.hpp"
 
-#include "asiolibs/opmon/FakeSocketWriterModule.pb.h"
+#include "asiolibs/opmon/SocketWriterModule.pb.h"
 
 #include <string>
 #include <memory>
@@ -37,17 +37,17 @@ namespace dunedaq::asiolibs {
  */
 constexpr double packet_rate_khz = 1;
 
-FakeSocketWriterModule::FakeSocketWriterModule(const std::string& name)
+SocketWriterModule::SocketWriterModule(const std::string& name)
   : DAQModule(name)
   , m_work_guard(boost::asio::make_work_guard(m_io_context))
 {
-  register_command("conf", &FakeSocketWriterModule::do_configure);
-  register_command("start", &FakeSocketWriterModule::do_start);
-  register_command("stop_trigger_sources", &FakeSocketWriterModule::do_stop);
+  register_command("conf", &SocketWriterModule::do_configure);
+  register_command("start", &SocketWriterModule::do_start);
+  register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
 void
-FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
+SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
   m_cfg = mcfg;
   auto* mdal = m_cfg->get_dal<appmodel::SocketDataWriterModule>(get_name());
@@ -106,7 +106,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
-        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
+        const auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
         m_writer_configs.emplace_back(remote_ip, socket_sender->get_port(), std::make_shared<SocketStats>());
       } 
     }
@@ -115,11 +115,11 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
   m_writers.reserve(m_writer_configs.size());
   if (m_socket_type == SocketType::TCP) {
     for (std::size_t i = 0; i < m_writer_configs.size(); ++i) {
-      m_writers.emplace_back(FakeTCPWriter());
+      m_writers.emplace_back(TCPWriter());
     }
   } else {
     for (std::size_t i = 0; i < m_writer_configs.size(); ++i) {
-      m_writers.emplace_back(FakeUDPWriter());
+      m_writers.emplace_back(UDPWriter());
     }
   }
 
@@ -142,19 +142,19 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
   }       
 }
 
-FakeSocketWriterModule::SocketType
-FakeSocketWriterModule::string_to_socket_type(const std::string& socket_type) const
+SocketWriterModule::SocketType
+SocketWriterModule::string_to_socket_type(const std::string& socket_type) const
 {
   if (socket_type == "TCP") {
-    return FakeSocketWriterModule::SocketType::TCP;
+    return SocketWriterModule::SocketType::TCP;
   } else if (socket_type == "UDP") {
-    return FakeSocketWriterModule::SocketType::UDP;
+    return SocketWriterModule::SocketType::UDP;
   }
-  return FakeSocketWriterModule::SocketType::INVALID;
+  return SocketWriterModule::SocketType::INVALID;
 }
 
 void
-FakeSocketWriterModule::do_configure(const data_t&)
+SocketWriterModule::do_configure(const data_t&)
 {
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
     const auto& writer_config = m_writer_configs[i];
@@ -163,7 +163,7 @@ FakeSocketWriterModule::do_configure(const data_t&)
 }
 
 void
-FakeSocketWriterModule::do_start(const data_t&)
+SocketWriterModule::do_start(const data_t&)
 {
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 
@@ -174,7 +174,7 @@ FakeSocketWriterModule::do_start(const data_t&)
 }
 
 void
-FakeSocketWriterModule::do_stop(const data_t&)
+SocketWriterModule::do_stop(const data_t&)
 {
   for (auto& writer : m_writers) {
     std::visit([](auto& writer) { writer.stop(); }, writer);
@@ -184,7 +184,7 @@ FakeSocketWriterModule::do_stop(const data_t&)
 }
 
 void
-FakeSocketWriterModule::generate_opmon_data()
+SocketWriterModule::generate_opmon_data()
 {
   for (const auto& writer_config : m_writer_configs) {
     opmon::SocketWriterStats stats;
@@ -195,7 +195,7 @@ FakeSocketWriterModule::generate_opmon_data()
 }
 
 void
-FakeSocketWriterModule::FakeTCPWriter::configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
+SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
 {
   m_socket_stats = writer_config.socket_stats;
 
@@ -216,7 +216,7 @@ FakeSocketWriterModule::FakeTCPWriter::configure(boost::asio::io_context& io_con
 }
 
 boost::asio::awaitable<void>
-FakeSocketWriterModule::FakeTCPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
+SocketWriterModule::TCPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
 {
   datahandlinglibs::RateLimiter rate_limiter(packet_rate_khz);
 
@@ -234,7 +234,7 @@ FakeSocketWriterModule::FakeTCPWriter::start(std::shared_ptr<FrameBuilder> frame
 }
 
 void
-FakeSocketWriterModule::FakeTCPWriter::stop()
+SocketWriterModule::TCPWriter::stop()
 {
   m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both);
   m_socket->close();
@@ -242,7 +242,7 @@ FakeSocketWriterModule::FakeTCPWriter::stop()
 }
 
 void
-FakeSocketWriterModule::FakeUDPWriter::configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
+SocketWriterModule::UDPWriter::configure(boost::asio::io_context& io_context, const WriterConfig& writer_config)
 {
   m_writer_config = writer_config;
 
@@ -256,7 +256,7 @@ FakeSocketWriterModule::FakeUDPWriter::configure(boost::asio::io_context& io_con
 }
 
 boost::asio::awaitable<void>
-FakeSocketWriterModule::FakeUDPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
+SocketWriterModule::UDPWriter::start(std::shared_ptr<FrameBuilder> frame_builder)
 {
   boost::asio::ip::udp::endpoint receiver_endpoint(boost::asio::ip::address::from_string(m_writer_config.remote_ip),
                                                    m_writer_config.remote_port);
@@ -277,7 +277,7 @@ FakeSocketWriterModule::FakeUDPWriter::start(std::shared_ptr<FrameBuilder> frame
 }
 
 void
-FakeSocketWriterModule::FakeUDPWriter::stop()
+SocketWriterModule::UDPWriter::stop()
 {
   m_socket->close();
   TLOG() << "Closed UDP socket";
@@ -285,4 +285,4 @@ FakeSocketWriterModule::FakeUDPWriter::stop()
 
 } // namespace dunedaq::asiolibs
 
-DEFINE_DUNE_DAQ_MODULE(dunedaq::asiolibs::FakeSocketWriterModule)
+DEFINE_DUNE_DAQ_MODULE(dunedaq::asiolibs::SocketWriterModule)

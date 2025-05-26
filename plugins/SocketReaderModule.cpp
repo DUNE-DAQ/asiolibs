@@ -11,7 +11,7 @@
 #include "CreateSource.hpp"
 
 #include "appmodel/DataReaderModule.hpp"
-#include "appmodel/FakeSocketDataSender.hpp"
+#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/SocketReaderConf.hpp"
 #include "appmodel/SocketReceiver.hpp"
@@ -111,7 +111,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
-        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
+        const auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
         m_reader_configs.emplace_back(
           local_ip, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
       }

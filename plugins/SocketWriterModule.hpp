@@ -1,12 +1,12 @@
 /**
- * @file FakeSocketWriterModule.hpp Boost.Asio-based fake socket writer plugin for low-bandwidth devices
+ * @file SocketWriterModule.hpp Boost.Asio-based socket writer plugin for low-bandwidth devices
  *
  * This is part of the DUNE DAQ , copyright 2020.
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
-#ifndef ASIOLIBS_PLUGINS_FAKESOCKETWRITERMODULE_HPP_
-#define ASIOLIBS_PLUGINS_FAKESOCKETWRITERMODULE_HPP_
+#ifndef ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
+#define ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
 
 #include "appfwk/DAQModule.hpp"
 
@@ -20,22 +20,22 @@ namespace dunedaq::asiolibs {
 
 class FrameBuilder;
 class ConfigurationManager;
-class FakeSocketWriterModule : public dunedaq::appfwk::DAQModule
+class SocketWriterModule : public dunedaq::appfwk::DAQModule
 {
 public:
   /**
-   * @brief FakeSocketWriterModule constructor
+   * @brief SocketWriterModule constructor
    * @param name DAQ module instance name
    */
-  explicit FakeSocketWriterModule(const std::string& name);
-  ~FakeSocketWriterModule() = default;
+  explicit SocketWriterModule(const std::string& name);
+  ~SocketWriterModule() = default;
 
-  FakeSocketWriterModule(const FakeSocketWriterModule&) = delete; ///< FakeSocketWriterModule is not copy-constructible
-  FakeSocketWriterModule& operator=(const FakeSocketWriterModule&) =
-    delete;                                                  ///< FakeSocketWriterModule is not copy-assignable
-  FakeSocketWriterModule(FakeSocketWriterModule&&) = delete; ///< FakeSocketWriterModule is not move-constructible
-  FakeSocketWriterModule& operator=(FakeSocketWriterModule&&) =
-    delete; ///< FakeSocketWriterModule is not move-assignable
+  SocketWriterModule(const SocketWriterModule&) = delete; ///< SocketWriterModule is not copy-constructible
+  SocketWriterModule& operator=(const SocketWriterModule&) =
+    delete;                                                  ///< SocketWriterModule is not copy-assignable
+  SocketWriterModule(SocketWriterModule&&) = delete; ///< SocketWriterModule is not move-constructible
+  SocketWriterModule& operator=(SocketWriterModule&&) =
+    delete; ///< SocketWriterModule is not move-assignable
 
   /**
    * @brief Handles initialization on boot
@@ -82,7 +82,7 @@ private:
     std::shared_ptr<SocketStats> socket_stats;
   };
 
-  class FakeTCPWriter
+  class TCPWriter
   {
   public:
     /**
@@ -117,7 +117,7 @@ private:
     std::shared_ptr<SocketStats> m_socket_stats;
   };
 
-  class FakeUDPWriter
+  class UDPWriter
   {
   public:
     /**
@@ -178,7 +178,7 @@ private:
   /**
    * @brief Socket writers
    */
-  std::vector<std::variant<FakeTCPWriter, FakeUDPWriter>> m_writers;
+  std::vector<std::variant<TCPWriter, UDPWriter>> m_writers;
 
   /**
    * @brief Background thread to keep the I/O context running
@@ -208,4 +208,4 @@ private:
 
 } // namespace dunedaq::asiolibs
 
-#endif // ASIOLIBS_PLUGINS_FAKESOCKETWRITERMODULE_HPP_
+#endif // ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
