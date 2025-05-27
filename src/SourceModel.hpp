@@ -114,8 +114,9 @@ public:
     return true;
   }
 
-  std::size_t get_buffer_size() const override {
-    return buffer_size;
+  std::size_t get_frame_size() const override {
+    TargetPayloadType target_payload; 
+    return target_payload.get_frame_size(); // TODO (DTE): Could be a static function?
   }
     
   void generate_opmon_data() override {

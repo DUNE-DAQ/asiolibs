@@ -248,7 +248,7 @@ SocketReaderModule::TCPReader::start(const sid_to_source_map_t& sources)
     co_return;
   }
 
-  const auto buffer_size = src_it->second->get_buffer_size();
+  const auto buffer_size = src_it->second->get_frame_size();
   std::vector<char> buffer(buffer_size);
 
   while (m_socket->is_open()) {
@@ -292,7 +292,7 @@ SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
     co_return;
   }
 
-  const auto buffer_size = src_it->second->get_buffer_size();
+  const auto buffer_size = src_it->second->get_frame_size();
   std::vector<char> buffer(buffer_size);
   boost::asio::ip::udp::endpoint sender_endpoint;
 
