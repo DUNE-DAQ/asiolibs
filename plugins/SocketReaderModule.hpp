@@ -101,7 +101,7 @@ private:
     void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
-     * @brief Asynchronously receives frames from the socket in a loop
+     * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
@@ -140,7 +140,7 @@ private:
     void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
-     * @brief Asynchronously receives frames from the socket in a loop
+     * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */

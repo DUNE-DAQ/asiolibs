@@ -3,8 +3,9 @@ syntax = "proto3";
 package dunedaq.asiolibs.opmon;
 
 message SocketWriterStats {
-
-  uint64 packets_sent = 1;
-  uint64 bytes_sent = 2;  
-  
+  uint64 sum_payloads = 1; // Total number of received payloads
+  uint64 num_payloads = 2; // Incremental number of received payloads 
+  uint64 sum_bytes = 3; // Total number of received bytes 
+  uint64 num_data_input_timeouts = 4; // Timeout on data inputs 
+  double rate_payloads_consumed = 5; // Rate of consumed packets 
 }

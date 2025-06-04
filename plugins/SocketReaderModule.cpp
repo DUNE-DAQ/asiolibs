@@ -304,6 +304,8 @@ SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
     m_socket_stats->bytes_received.fetch_add(bytes_received);
 
     if (bytes_received == buffer_size) [[likely]] {
+      auto frame = reinterpret_cast<fddetdataformats::CRTBernFrame*>(buffer.data());
+      TLOG() << frame->daq_header << std::endl;
       src_it->second->handle_payload(buffer.data(), bytes_received);
     } else {
       TLOG() << "Payload is smaller than " << buffer_size << " (" << bytes_received << ")";
