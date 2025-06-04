@@ -157,7 +157,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 
     auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
     register_node(queue->UID(), ptr);
-  }
+  }  
 }
 
 SocketReaderModule::SocketType
@@ -242,13 +242,14 @@ SocketReaderModule::TCPReader::configure(boost::asio::io_context& io_context, co
 boost::asio::awaitable<void>
 SocketReaderModule::TCPReader::start(const sid_to_source_map_t& sources)
 {
-  const auto src_it = sources.find(m_source_id); // FIXME (DTE): I can just pass the relevant source instead of all sources? I have misunderstandings with sources
+  // FIXME (DTE): Just pass the relevant source instead of all sources
+  const auto src_it = sources.find(m_source_id);
   if (src_it == sources.end()) {
     TLOG() << "Unexpected source ID! (" << m_source_id << ")";
     co_return;
   }
 
-  const auto buffer_size = src_it->second->get_frame_size();
+  const auto buffer_size = src_it->second->get_target_payload_size();
   std::vector<char> buffer(buffer_size);
 
   while (m_socket->is_open()) {
@@ -292,7 +293,7 @@ SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
     co_return;
   }
 
-  const auto buffer_size = src_it->second->get_frame_size();
+  const auto buffer_size = src_it->second->get_target_payload_size();
   std::vector<char> buffer(buffer_size);
   boost::asio::ip::udp::endpoint sender_endpoint;
 
@@ -304,8 +305,6 @@ SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
     m_socket_stats->bytes_received.fetch_add(bytes_received);
 
     if (bytes_received == buffer_size) [[likely]] {
-      auto frame = reinterpret_cast<fddetdataformats::CRTBernFrame*>(buffer.data());
-      TLOG() << frame->daq_header << std::endl;
       src_it->second->handle_payload(buffer.data(), bytes_received);
     } else {
       TLOG() << "Payload is smaller than " << buffer_size << " (" << bytes_received << ")";

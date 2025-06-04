@@ -41,11 +41,6 @@ public:
   using data_t = nlohmann::json;
 
   /**
-   * @brief Buffer size based on TargetPayloadType
-   */
-  static constexpr auto buffer_size = sizeof(TargetPayloadType);
-
-  /**
    * @brief SourceModel Constructor
    * @param name Instance name for this SourceModel instance
    */
@@ -114,7 +109,7 @@ public:
     return true;
   }
 
-  std::size_t get_frame_size() const override {
+  std::size_t get_target_payload_size() const override {
     TargetPayloadType target_payload; 
     return target_payload.get_frame_size(); // TODO (DTE): Could be a static function?
   }
