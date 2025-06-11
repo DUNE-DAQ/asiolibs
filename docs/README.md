@@ -2,7 +2,7 @@
 
 Boost.Asio-based socket reader plugin for low-bandwidth devices
 
-# Overview
+# Example usage
 
 `local-crt-bern1x1-config` and `local-crt-grenoble-1x1-config` (defined in `daqsystemtest/config/daqsystemtest/example-configs.data.xml`) are session configurations with a CRT reader application accompanied by a socket reader application.
 
@@ -16,7 +16,7 @@ Socket reader application includes a data reader (`SocketReaderModule`) which re
 
 ![local-crt-grenoble-1x1-config](local-crt-grenoble-1x1-config.svg)
 
-# How to run
+## How to run
 
 ```
 drunc-unified-shell ssh-standalone config/daqsystemtest/example-configs.data.xml local-crt-bern-1x1-config uname-local-test
