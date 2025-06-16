@@ -11,7 +11,7 @@
 #include "CreateSource.hpp"
 
 #include "appmodel/DataReaderModule.hpp"
-#include "appmodel/FakeSocketDataSender.hpp"
+#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataSender.hpp"
 #include "appmodel/SocketReaderConf.hpp"
 #include "appmodel/SocketReceiver.hpp"
@@ -30,26 +30,6 @@
 #include <utility>
 
 namespace dunedaq::asiolibs {
-
-/**
- * @brief Minimum valid payload size in bytes
- */
-constexpr int min_expected_payload_size = 7000;
-
-/**
- * @brief Buffer size based on WIBEthFrame
- */
-constexpr int buffer_size = sizeof(fddetdataformats::WIBEthFrame);
-  
-void
-handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id)
-{
-  if (auto src_it = sources.find(source_id); src_it != sources.end()) {
-    src_it->second->handle_payload(buffer, size);
-  } else {
-    TLOG() << "Unexpected StreamID in payload! (" << source_id << ")";
-  }
-}
 
 SocketReaderModule::SocketReaderModule(const std::string& name)
   : DAQModule(name)
@@ -131,7 +111,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 
       for (auto* res : nw_sender->get_contains()) {
         auto* det_stream = res->cast<confmodel::DetectorStream>();
-        const auto* socket_sender = nw_sender->cast<appmodel::FakeSocketDataSender>();
+        const auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
         m_reader_configs.emplace_back(
           local_ip, socket_sender->get_port(), det_stream->get_source_id(), std::make_shared<SocketStats>());
       }
@@ -177,7 +157,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 
     auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
     register_node(queue->UID(), ptr);
-  }
+  }  
 }
 
 SocketReaderModule::SocketType
@@ -262,17 +242,24 @@ SocketReaderModule::TCPReader::configure(boost::asio::io_context& io_context, co
 boost::asio::awaitable<void>
 SocketReaderModule::TCPReader::start(const sid_to_source_map_t& sources)
 {
-  boost::array<char, buffer_size> buffer;
+  // FIXME (DTE): Just pass the relevant source instead of all sources
+  const auto src_it = sources.find(m_source_id);
+  if (src_it == sources.end()) {
+    TLOG() << "Unexpected source ID! (" << m_source_id << ")";
+    co_return;
+  }
+
+  const auto buffer_size = src_it->second->get_target_payload_size();
+  std::vector<char> buffer(buffer_size);
 
   while (m_socket->is_open()) {
     const auto bytes_received =
       co_await boost::asio::async_read(*m_socket,
                                        boost::asio::buffer(buffer),
-                                       boost::asio::transfer_at_least(min_expected_payload_size),
                                        boost::asio::use_awaitable);
     ++m_socket_stats->packets_received;
     m_socket_stats->bytes_received.fetch_add(bytes_received);
-    handle_eth_payload(sources, buffer.data(), bytes_received, m_source_id);
+    src_it->second->handle_payload(buffer.data(), bytes_received);
   }
 }
 
@@ -300,7 +287,14 @@ SocketReaderModule::UDPReader::configure(boost::asio::io_context& io_context, co
 boost::asio::awaitable<void>
 SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
 {
-  boost::array<char, buffer_size> buffer;
+  const auto src_it = sources.find(m_source_id);
+  if (src_it == sources.end()) {
+    TLOG() << "Unexpected source ID! (" << m_source_id << ")";
+    co_return;
+  }
+
+  const auto buffer_size = src_it->second->get_target_payload_size();
+  std::vector<char> buffer(buffer_size);
   boost::asio::ip::udp::endpoint sender_endpoint;
 
   while (m_socket->is_open()) {
@@ -310,10 +304,10 @@ SocketReaderModule::UDPReader::start(const sid_to_source_map_t& sources)
     ++m_socket_stats->packets_received;
     m_socket_stats->bytes_received.fetch_add(bytes_received);
 
-    if (bytes_received > min_expected_payload_size) [[likely]] { // RS FIXME: do proper check on data length later
-      handle_eth_payload(sources, buffer.data(), bytes_received, m_source_id);
+    if (bytes_received == buffer_size) [[likely]] {
+      src_it->second->handle_payload(buffer.data(), bytes_received);
     } else {
-      TLOG() << "Payload is smaller than " << min_expected_payload_size << " (" << bytes_received << ")";
+      TLOG() << "Payload is smaller than " << buffer_size << " (" << bytes_received << ")";
     }
   }
 }

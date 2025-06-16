@@ -8,11 +8,7 @@
 #ifndef ASIOLIBS_PLUGINS_SOCKETREADERMODULE_HPP_
 #define ASIOLIBS_PLUGINS_SOCKETREADERMODULE_HPP_
 
-#include "SourceConcept.hpp"
-
 #include "appfwk/DAQModule.hpp"
-
-#include "fddetdataformats/WIBEthFrame.hpp"
 
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
@@ -24,16 +20,9 @@
 
 namespace dunedaq::asiolibs {
 
-using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
+class SourceConcept;
 
-/**
- * @brief Forwards the payload to get processed
- * @param sources Data sources
- * @param buffer Payload buffer
- * @param size Payload size
- * @param source_id Detector stream source ID
- */
-void handle_eth_payload(const sid_to_source_map_t& sources, char* buffer, std::size_t size, uint source_id);
+using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
 
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
@@ -112,7 +101,7 @@ private:
     void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
-     * @brief Asynchronously reads data from the socket in a loop
+     * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
@@ -151,7 +140,7 @@ private:
     void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
 
     /**
-     * @brief Asynchronously reads data from the socket in a loop
+     * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */

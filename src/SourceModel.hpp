@@ -109,6 +109,11 @@ public:
     return true;
   }
 
+  std::size_t get_target_payload_size() const override {
+    TargetPayloadType target_payload; 
+    return target_payload.get_frame_size(); // TODO (DTE): Could be a static function?
+  }
+    
   void generate_opmon_data() override {
 
     opmon::SourceInfo info;
