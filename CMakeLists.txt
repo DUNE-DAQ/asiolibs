@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(asiolibs VERSION 1.0.0)
+project(asiolibs VERSION 1.1.0)
 
 find_package(daq-cmake REQUIRED)
 
@@ -25,6 +25,6 @@ daq_add_library(*.cpp LINK_LIBRARIES ${DUNEDAQ_DEPENDENCIES})
 ##############################################################################
 # Plugins
 daq_add_plugin(SocketReaderModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
-daq_add_plugin(FakeSocketWriterModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
+daq_add_plugin(SocketWriterModule duneDAQModule LINK_LIBRARIES asiolibs opmonlib::opmonlib)
 
 daq_install()
