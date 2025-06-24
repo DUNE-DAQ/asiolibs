@@ -152,7 +152,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
       throw err;
     }
 
-    if (connection->disabled(*(m_cfg->session()))) {
+    if (connection->is_disabled(*(m_cfg->session()))) {
       continue;
     }
 
@@ -164,7 +164,7 @@ FakeSocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager>
 
     for (auto* nw_sender : d2d_conn->get_net_senders()) {
 
-      if (nw_sender->disabled(*(m_cfg->session()))) {
+      if (nw_sender->is_disabled(*(m_cfg->session()))) {
         continue;
       }
 

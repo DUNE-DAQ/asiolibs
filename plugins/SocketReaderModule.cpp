@@ -88,7 +88,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   std::vector<const appmodel::NetworkDetectorToDaqConnection*> d2d_conns;
   for (auto* connection : mdal->get_connections()) {
 
-    if (connection->disabled(*(m_cfg->session()))) {
+    if (connection->is_disabled(*(m_cfg->session()))) {
       continue;
     }
 
@@ -118,7 +118,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
                       d2d_conn->UID()));
       }
 
-      if (socket_sender->disabled(*(m_cfg->session()))) {
+      if (socket_sender->is_disabled(*(m_cfg->session()))) {
         continue;
       }
 
