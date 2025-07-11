@@ -34,6 +34,7 @@ namespace dunedaq::asiolibs {
 SocketWriterModule::SocketWriterModule(const std::string& name)
   : DAQModule(name)
   , m_work_guard(boost::asio::make_work_guard(m_io_context))
+  , m_raw_receiver_timeout_ms(0)
 {
   register_command("conf", &SocketWriterModule::do_configure);
   register_command("start", &SocketWriterModule::do_start);
@@ -201,9 +202,6 @@ SocketWriterModule::run_consume()
       for (const auto& writer_config : m_writer_configs) {
         ++writer_config.socket_stats->rawq_timeout_count;
       }
-      // Protection against a zero sleep becoming a yield
-      if (m_raw_receiver_sleep_us != std::chrono::microseconds::zero())
-        std::this_thread::sleep_for(m_raw_receiver_sleep_us);
     }
   }
 
