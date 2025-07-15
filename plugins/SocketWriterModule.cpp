@@ -16,7 +16,7 @@
 #include "appmodel/SocketReceiver.hpp"
 #include "appmodel/SocketWriterConf.hpp"
 #include "confmodel/DetectorStream.hpp"
-#include "confmodel/DetectorToDaqConnection.hpp"
+#include "appmodel/NetworkDetectorToDaqConnection.hpp"
 #include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
@@ -102,54 +102,33 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
     throw std::invalid_argument("Error: Only TCP and UDP are allowed!");
   }
 
-  std::vector<const confmodel::DetectorToDaqConnection*> d2d_conns;
-  for (auto* res : mdal->get_connections()) {
-    auto* connection = res->cast<confmodel::DetectorToDaqConnection>();
-
-    if (connection == nullptr) {
-      dunedaq::datahandlinglibs::GenericConfigurationError err(
-        ERS_HERE, "DetectorToDaqConnection configuration failed due expected but unavailable connection!");
-      ers::fatal(err);
-      throw err;
-    }
-
-    if (connection->disabled(*(m_cfg->session()))) {
+  for (auto* d2d_conn : mdal->get_connections()) {
+    if (d2d_conn->is_disabled(*(m_cfg->session()))) {
       continue;
     }
 
-    d2d_conns.push_back(connection);
-  }
-
-  for (auto* d2d_conn : d2d_conns) {
-    auto* socket_receiver = d2d_conn->get_receiver()->cast<appmodel::SocketReceiver>();
-
-    for (auto* sender : d2d_conn->get_senders()) {
-      auto* nw_sender = sender->cast<appmodel::NWDetDataSender>();
-
-      if (!nw_sender) {
-        throw dunedaq::datahandlinglibs::InitializationError(
-          ERS_HERE,
-          fmt::format("Found {} of type {} in connection {} while expecting type NWDetDataSender",
-                      socket_receiver->class_name(),
-                      socket_receiver->UID(),
-                      d2d_conn->UID()));
-      }
-
-      if (nw_sender->disabled(*(m_cfg->session()))) {
+    for (auto* nw_sender : d2d_conn->get_net_senders()) {
+      
+      if (nw_sender->is_disabled(*(m_cfg->session()))) {
         continue;
       }
 
-      if (nw_sender->get_contains().size() > 1) {
+      if (nw_sender->get_streams().size() > 1) {
         dunedaq::datahandlinglibs::GenericConfigurationError err(ERS_HERE,
                                                                  "Multiple streams currently are not supported!");
         ers::fatal(err);
         throw err;
       }
-
-      for (auto* res : nw_sender->get_contains()) {
-        const auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
-        m_writer_configs.emplace_back(remote_ip, socket_sender->get_port(), std::make_shared<SocketStats>());
-      } 
+      const auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
+      if (socket_sender == nullptr) {
+        throw dunedaq::datahandlinglibs::InitializationError(
+          ERS_HERE,
+          fmt::format("Found {} of type {} in connection {} while expecting type SocketDetDataSender",
+                      nw_sender->class_name(),
+                      nw_sender->UID(),
+                      d2d_conn->UID()));
+      }
+      m_writer_configs.emplace_back(remote_ip, socket_sender->get_port(), std::make_shared<SocketStats>());
     }
   }
 
