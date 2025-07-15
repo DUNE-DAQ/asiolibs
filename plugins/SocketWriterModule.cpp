@@ -34,7 +34,6 @@ namespace dunedaq::asiolibs {
 SocketWriterModule::SocketWriterModule(const std::string& name)
   : DAQModule(name)
   , m_work_guard(boost::asio::make_work_guard(m_io_context))
-  , m_raw_receiver_timeout_ms(0)
 {
   register_command("conf", &SocketWriterModule::do_configure);
   register_command("start", &SocketWriterModule::do_start);
@@ -74,7 +73,12 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
       }
 
       if (!m_callback_mode) {
-        m_raw_receiver_timeout_ms = std::chrono::milliseconds(input->get_recv_timeout_ms());
+        const auto recv_timeout_ms = input->get_recv_timeout_ms();
+        if (recv_timeout_ms == 0) {
+          TLOG() << "recv_timeout_ms is 0 or missing in the configuration. The default value " << m_raw_receiver_timeout_ms << " will be used.";
+        } else {
+          m_raw_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
+        }
       }
 
       auto* queue = input->cast<confmodel::QueueWithSourceId>();
