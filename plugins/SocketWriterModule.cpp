@@ -73,7 +73,12 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
       }
 
       if (!m_callback_mode) {
-        m_raw_receiver_timeout_ms = std::chrono::milliseconds(input->get_recv_timeout_ms());
+        const auto recv_timeout_ms = input->get_recv_timeout_ms();
+        if (recv_timeout_ms == 0) {
+          TLOG() << "recv_timeout_ms is 0 or missing in the configuration. The default value " << m_raw_receiver_timeout_ms << " will be used.";
+        } else {
+          m_raw_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
+        }
       }
 
       auto* queue = input->cast<confmodel::QueueWithSourceId>();
@@ -180,9 +185,6 @@ SocketWriterModule::run_consume()
       for (const auto& writer_config : m_writer_configs) {
         ++writer_config.socket_stats->rawq_timeout_count;
       }
-      // Protection against a zero sleep becoming a yield
-      if (m_raw_receiver_sleep_us != std::chrono::microseconds::zero())
-        std::this_thread::sleep_for(m_raw_receiver_sleep_us);
     }
   }
 
