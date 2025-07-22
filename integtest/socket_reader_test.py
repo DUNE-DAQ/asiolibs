@@ -43,11 +43,15 @@ common_config_obj.config_db = (
     os.path.dirname(__file__) + "/../../daqsystemtest/config/daqsystemtest/example-configs.data.xml"
 )
 
-onebyone_local_socket_conf = copy.deepcopy(common_config_obj)
-onebyone_local_socket_conf.session = "local-socket-1x1-config"
+onebyone_local_crt_bern_conf = copy.deepcopy(common_config_obj)
+onebyone_local_crt_bern_conf.session = "local-crt-bern-1x1-config"
+
+onebyone_local_crt_grenoble_conf = copy.deepcopy(common_config_obj)
+onebyone_local_crt_grenoble_conf.session = "local-crt-grenoble-1x1-config"
 
 confgen_arguments = {
-    "Local Socket 1x1 Conf": onebyone_local_socket_conf,
+    "Local CRT Bern 1x1 Conf": onebyone_local_crt_bern_conf,
+    "Local CRT Grenoble 1x1 Conf": onebyone_local_crt_grenoble_conf,
 }
 
 nanorc_command_list = "boot conf".split()
