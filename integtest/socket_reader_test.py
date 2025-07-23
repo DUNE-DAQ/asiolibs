@@ -22,16 +22,8 @@ check_for_logfile_errors = True
 hostname = os.uname().nodename
 
 ignored_logfile_problems = {
-    "-controller": [
-        "Worker with pid \\d+ was terminated due to signal 1",
-        "Connection '.*' not found on the application registry",
-    ],
-    "connectivity-service": [
-        "errorlog: -",
-    ],
     "local-connection-server": [
         "errorlog: -",
-        "Worker with pid \\d+ was terminated due to signal",
         r"Worker \(pid:\d+\) was sent SIGHUP"
     ],    
 }
