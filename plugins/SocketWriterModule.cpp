@@ -51,45 +51,43 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
   }
 
   for (auto* input : mdal->get_inputs()) {
-    if (input->get_data_type() != "DataRequest") {
-      m_raw_data_receiver_connection_name = input->UID();
-      // Parse for prefix
-      std::string conn_name = input->UID(); 
-      const char delim = '_';
-      std::vector<std::string> words;
-      std::size_t start;
-      std::size_t end = 0;
-      while ((start = conn_name.find_first_not_of(delim, end)) != std::string::npos) {
-        end = conn_name.find(delim, start);
-        words.push_back(conn_name.substr(start, end - start));
-      }
-
-      TLOG_DEBUG() << "Initialize connection based on uid: " 
-        << m_raw_data_receiver_connection_name << " front word: " << words.front();
-
-      std::string cb_prefix("cb");
-      if (words.front() == cb_prefix) {
-        m_callback_mode = true;
-      }
-
-      if (!m_callback_mode) {
-        const auto recv_timeout_ms = input->get_recv_timeout_ms();
-        if (recv_timeout_ms == 0) {
-          TLOG() << "recv_timeout_ms is 0 or missing in the configuration. The default value " << m_raw_receiver_timeout_ms << " will be used.";
-        } else {
-          m_raw_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
-        }
-      }
-
-      auto* queue = input->cast<confmodel::QueueWithSourceId>();
-      if (queue == nullptr) {
-        auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Inputs are not of type QueueWithGeoId.");
-        ers::fatal(err);
-        throw err;
-      }  
-
-      m_raw_data_receiver = createGenericReceiver(queue->UID(), m_raw_data_receiver_connection_name); // FIXME (DTE): Overwriting doesn't make sense      
+    m_raw_data_receiver_connection_name = input->UID();
+    // Parse for prefix
+    std::string conn_name = input->UID(); 
+    const char delim = '_';
+    std::vector<std::string> words;
+    std::size_t start;
+    std::size_t end = 0;
+    while ((start = conn_name.find_first_not_of(delim, end)) != std::string::npos) {
+      end = conn_name.find(delim, start);
+      words.push_back(conn_name.substr(start, end - start));
     }
+
+    TLOG_DEBUG() << "Initialize connection based on uid: " 
+                 << m_raw_data_receiver_connection_name << " front word: " << words.front();
+
+    std::string cb_prefix("cb");
+    if (words.front() == cb_prefix) {
+      m_callback_mode = true;
+    }
+
+    if (!m_callback_mode) {
+      const auto recv_timeout_ms = input->get_recv_timeout_ms();
+      if (recv_timeout_ms == 0) {
+        TLOG() << "recv_timeout_ms is 0 or missing in the configuration. The default value " << m_raw_receiver_timeout_ms << " will be used.";
+      } else {
+        m_raw_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
+      }
+    }
+
+    auto* queue = input->cast<confmodel::QueueWithSourceId>();
+    if (queue == nullptr) {
+      auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Inputs are not of type QueueWithGeoId.");
+      ers::fatal(err);
+      throw err;
+    }  
+
+    m_raw_data_receiver = createGenericReceiver(queue->UID(), m_raw_data_receiver_connection_name); // FIXME (DTE): Overwriting doesn't make sense      
   }    
 }
 
