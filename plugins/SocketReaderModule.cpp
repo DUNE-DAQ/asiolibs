@@ -84,8 +84,6 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   }
 
   for (auto* d2d_conn : d2d_conns) {
-    auto* socket_receiver = d2d_conn->get_net_receiver()->cast<appmodel::SocketReceiver>();
-
     for (auto* sender : d2d_conn->get_net_senders()) {
       auto* socket_sender = sender->cast<appmodel::SocketDataSender>();
 
