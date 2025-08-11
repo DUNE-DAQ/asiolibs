@@ -5,6 +5,7 @@ find_package(daq-cmake REQUIRED)
 
 daq_setup_environment()
 
+find_package(ers REQUIRED)
 find_package(appfwk REQUIRED)
 find_package(logging REQUIRED)
 find_package(fddetdataformats REQUIRED)
@@ -16,7 +17,7 @@ daq_protobuf_codegen(opmon/*.proto)
 
 ##############################################################################
 # Dependency sets
-set(DUNEDAQ_DEPENDENCIES datahandlinglibs::datahandlinglibs fddetdataformats::fddetdataformats fdreadoutlibs::fdreadoutlibs)
+set(DUNEDAQ_DEPENDENCIES datahandlinglibs::datahandlinglibs fddetdataformats::fddetdataformats fdreadoutlibs::fdreadoutlibs ers::ers)
 
 ##############################################################################
 # Main library
