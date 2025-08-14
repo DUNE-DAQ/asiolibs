@@ -3,6 +3,7 @@ import os
 import re
 import copy
 
+import integrationtest.data_file_checks as data_file_checks
 import integrationtest.log_file_checks as log_file_checks
 import integrationtest.data_classes as data_classes
 
@@ -14,8 +15,24 @@ number_of_readout_apps = 1
 run_duration = 20  # seconds
 
 # Default values for validation parameters
+expected_number_of_data_files = 1
 check_for_logfile_errors = True
 hostname = os.uname().nodename
+
+bern_crt_frag_params = {
+    "fragment_type_description": "CRTBern",
+    "fragment_type": "CRTBern",
+    "expected_fragment_count": number_of_data_producers,
+    "min_size_bytes": 384,
+    "max_size_bytes": 488,
+}
+grenoble_crt_frag_params = {
+    "fragment_type_description": "CRTGrenoble",
+    "fragment_type": "CRTGrenoble",
+    "expected_fragment_count": number_of_data_producers,
+    "min_size_bytes": 1752,
+    "max_size_bytes": 2312,
+}
 
 ignored_logfile_problems = {
     "local-connection-server": [
@@ -84,3 +101,31 @@ def test_log_files(run_nanorc):
         assert log_file_checks.logs_are_error_free(
             run_nanorc.log_files, True, True, ignored_logfile_problems
         )
+
+def test_data_files(run_nanorc):
+    fragment_check_list = []
+    current_test = os.environ.get("PYTEST_CURRENT_TEST")
+    if "BernCRT" in current_test:
+        fragment_check_list.append(bern_crt_frag_params)
+    elif "GrenobleCRT" in current_test:
+        fragment_check_list.append(grenoble_crt_frag_params)
+    # Run some tests on the output data file
+    all_ok = True
+    all_ok &= len(run_nanorc.data_files) == expected_number_of_data_files
+    print("") # Clear potential dot from pytest
+    if all_ok:
+        print(f"\N{WHITE HEAVY CHECK MARK} The correct number of raw data files was found ({expected_number_of_data_files})")
+    else:
+        print(f"\N{POLICE CARS REVOLVING LIGHT} An incorrect number of raw data files was found, expected {expected_number_of_data_files}, found {len(run_nanorc.data_files)} \N{POLICE CARS REVOLVING LIGHT}")
+
+    for idx in range(len(run_nanorc.data_files)):
+        data_file = data_file_checks.DataFile(run_nanorc.data_files[idx])
+        for jdx in range(len(fragment_check_list)):
+            all_ok &= data_file_checks.check_fragment_count(
+                data_file, fragment_check_list[jdx]
+            )
+            all_ok &= data_file_checks.check_fragment_sizes(
+                data_file, fragment_check_list[jdx]
+            )
+
+    assert all_ok
