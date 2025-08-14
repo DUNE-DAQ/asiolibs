@@ -8,6 +8,8 @@
 #ifndef ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
 #define ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
 
+#include "GenericReceiverConcept.hpp"
+
 #include "appfwk/DAQModule.hpp"
 
 #include "appmodel/SocketDataWriterModule.hpp"
@@ -20,7 +22,6 @@
 
 namespace dunedaq::asiolibs {
 
-class GenericReceiverConcept;
 class ConfigurationManager;
 class SocketDataWriterModule;
 
@@ -127,7 +128,7 @@ private:
      * @param payload Payload to send
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const std::pair<const void*, std::size_t>& payload);
+    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
 
     /**
      * @brief Closes the socket
@@ -161,7 +162,7 @@ private:
      * @param payload Payload to send
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const std::pair<const void*, std::size_t>& payload);
+    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
 
     /**
      * @brief Closes the socket
@@ -209,7 +210,7 @@ private:
    * @brief Raw data consume callback function
    * @param payload Consumed data
    */  
-  void consume_payload(const std::pair<const void*, std::size_t>& payload);  
+  void consume_payload(GenericReceiverConcept::TypeErasedPayload payload);  
 
   /**
    * @brief I/O context for socket operations
@@ -282,7 +283,7 @@ private:
   /**
    * @brief Raw data consume callback
    */    
-  std::function<void(const std::pair<const void*, std::size_t>& payload)> m_consume_callback;  
+  std::function<void(GenericReceiverConcept::TypeErasedPayload payload)> m_consume_callback;  
 
   // RUN START T0
   /**

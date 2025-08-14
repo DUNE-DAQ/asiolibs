@@ -176,11 +176,8 @@ SocketWriterModule::run_consume()
   while (m_run_marker.load()) {
     // Try to acquire data
 
-    const auto opt_payload = m_raw_data_receiver->try_receive(m_raw_receiver_timeout_ms);
-
-    if (opt_payload) {
-      auto& payload = opt_payload.value();
-      consume_payload(payload);    
+    if (auto opt_payload = m_raw_data_receiver->try_receive(m_raw_receiver_timeout_ms)) {
+      consume_payload(std::move(*opt_payload));
     } else {
       for (const auto& writer_config : m_writer_configs) {
         ++writer_config.socket_stats->rawq_timeout_count;
@@ -192,12 +189,13 @@ SocketWriterModule::run_consume()
 }
 
 void
-SocketWriterModule::consume_payload(const std::pair<const void*, std::size_t>& payload)
+SocketWriterModule::consume_payload(GenericReceiverConcept::TypeErasedPayload payload)
 {
-    for (std::size_t i = 0; i < m_writers.size(); ++i) {
-      boost::asio::co_spawn(
-        m_io_context, std::visit([this, &payload](auto& writer) { return writer.start(payload); }, m_writers[i]), boost::asio::detached);
-    }  
+  for (auto& writer : m_writers) {
+    std::visit([this, payload](auto& w) mutable { // lets payload to be moved
+      boost::asio::co_spawn(m_io_context, w.start(std::move(payload)), boost::asio::detached);
+    }, writer);
+  }
 }
 
 void
@@ -210,7 +208,7 @@ SocketWriterModule::do_configure(const data_t&)
  
     // Register callback
     auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
-    dmcbr->register_callback<std::pair<const void*, std::size_t>>(m_raw_data_receiver_connection_name, m_consume_callback);
+    dmcbr->register_callback<GenericReceiverConcept::TypeErasedPayload>(m_raw_data_receiver_connection_name, m_consume_callback);
   }
 
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
@@ -301,10 +299,10 @@ SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, co
 }
 
 boost::asio::awaitable<void>
-SocketWriterModule::TCPWriter::start(const std::pair<const void*, std::size_t>& payload) // TODO (DTE): Rename
+SocketWriterModule::TCPWriter::start(GenericReceiverConcept::TypeErasedPayload payload) // TODO (DTE): Rename
 {
   const auto bytes_sent =
-    co_await m_socket->async_send(boost::asio::buffer(payload.first, payload.second), boost::asio::use_awaitable);
+    co_await boost::asio::async_write(*m_socket, boost::asio::buffer(payload.data, payload.size), boost::asio::use_awaitable);
   ++m_socket_stats->num_payloads;
   ++m_socket_stats->sum_payloads;
   m_socket_stats->sum_bytes.fetch_add(bytes_sent);
@@ -334,12 +332,12 @@ SocketWriterModule::UDPWriter::configure(boost::asio::io_context& io_context, co
 }
 
 boost::asio::awaitable<void>
-SocketWriterModule::UDPWriter::start(const std::pair<const void*, std::size_t>& payload)
+SocketWriterModule::UDPWriter::start(GenericReceiverConcept::TypeErasedPayload payload)
 {
   boost::asio::ip::udp::endpoint receiver_endpoint(boost::asio::ip::address::from_string(m_writer_config.remote_ip),
                                                    m_writer_config.remote_port);
   const auto bytes_sent = co_await m_socket->async_send_to(
-    boost::asio::buffer(payload.first, payload.second), receiver_endpoint, boost::asio::use_awaitable);
+      boost::asio::buffer(payload.data, payload.size), receiver_endpoint, boost::asio::use_awaitable);
   ++m_writer_config.socket_stats->num_payloads;
   ++m_writer_config.socket_stats->sum_payloads;
   m_writer_config.socket_stats->sum_bytes.fetch_add(bytes_sent);

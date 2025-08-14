@@ -20,11 +20,13 @@ public:
     : m_receiver(get_iom_receiver<TargetPayloadType>(raw_data_receiver_connection_name))
   {}
 
-  std::optional<std::pair<const void*, std::size_t>> try_receive(dunedaq::iomanager::Receiver::timeout_t timeout) override {
+  std::optional<TypeErasedPayload> try_receive(dunedaq::iomanager::Receiver::timeout_t timeout) override {
     auto opt_payload = m_receiver->try_receive(timeout);
     if (opt_payload) {
-        m_received = std::move(*opt_payload);
-        return std::make_pair(&m_received, sizeof(TargetPayloadType));
+      // Allocate the received payload on the heap with shared ownership,
+      // so its lifetime can outlive this function and be tied to async sends.
+      auto payload = std::make_shared<TargetPayloadType>(std::move(*opt_payload));
+      return TypeErasedPayload{ std::reinterpret_pointer_cast<const void>(payload), payload.get(), sizeof(*payload) };
     }
     return std::nullopt;
   }
@@ -34,11 +36,6 @@ private:
    * @brief Generic IOManager Receiver
    */
   std::shared_ptr<iomanager::ReceiverConcept<TargetPayloadType>> m_receiver;
-
-  /**
-   * @brief Last received payload
-   */  
-  TargetPayloadType m_received;
 };
 
 } // namespace dunedaq::asiolibs
