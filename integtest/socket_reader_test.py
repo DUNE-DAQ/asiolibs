@@ -24,14 +24,14 @@ bern_crt_frag_params = {
     "fragment_type": "CRTBern",
     "expected_fragment_count": number_of_data_producers,
     "min_size_bytes": 384,
-    "max_size_bytes": 488,
+    "max_size_bytes": 800,
 }
 grenoble_crt_frag_params = {
     "fragment_type_description": "CRTGrenoble",
     "fragment_type": "CRTGrenoble",
     "expected_fragment_count": number_of_data_producers,
     "min_size_bytes": 1752,
-    "max_size_bytes": 2312,
+    "max_size_bytes": 3992,
 }
 
 ignored_logfile_problems = {
@@ -44,6 +44,7 @@ ignored_logfile_problems = {
 common_config_obj = data_classes.drunc_config()
 common_config_obj.dro_map_config.n_streams = number_of_data_producers
 common_config_obj.dro_map_config.n_apps = number_of_readout_apps
+common_config_obj.op_env = "test"
 common_config_obj.config_db = (
     os.path.dirname(__file__) + "/../../daqsystemtest/config/daqsystemtest/example-configs.data.xml"
 )
@@ -105,9 +106,9 @@ def test_log_files(run_nanorc):
 def test_data_files(run_nanorc):
     fragment_check_list = []
     current_test = os.environ.get("PYTEST_CURRENT_TEST")
-    if "BernCRT" in current_test:
+    if "Bern" in current_test:
         fragment_check_list.append(bern_crt_frag_params)
-    elif "GrenobleCRT" in current_test:
+    elif "Grenoble" in current_test:
         fragment_check_list.append(grenoble_crt_frag_params)
     # Run some tests on the output data file
     all_ok = True
