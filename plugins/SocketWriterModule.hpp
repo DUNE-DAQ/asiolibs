@@ -11,6 +11,7 @@
 #include "GenericReceiverConcept.hpp"
 
 #include "appfwk/DAQModule.hpp"
+#include "utilities/ReusableThread.hpp"
 
 #include "appmodel/SocketDataWriterModule.hpp"
 
