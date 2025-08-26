@@ -68,7 +68,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   std::vector<const appmodel::NetworkDetectorToDaqConnection*> d2d_conns;
   for (auto* connection : mdal->get_connections()) {
 
-    if (connection->is_disabled(*(m_cfg->session()))) {
+    if (connection->is_disabled(*(m_cfg->get_session()))) {
       continue;
     }
 
@@ -96,7 +96,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
                       d2d_conn->UID()));
       }
 
-      if (socket_sender->is_disabled(*(m_cfg->session()))) {
+      if (socket_sender->is_disabled(*(m_cfg->get_session()))) {
         continue;
       }
 
@@ -168,7 +168,7 @@ SocketReaderModule::string_to_socket_type(const std::string& socket_type) const
 }
 
 void
-SocketReaderModule::do_configure(const data_t&)
+SocketReaderModule::do_configure(const CommandData_t&)
 {
   for (std::size_t i = 0; i < m_readers.size(); ++i) {
     const auto reader_config = m_reader_configs[i];
@@ -177,7 +177,7 @@ SocketReaderModule::do_configure(const data_t&)
 }
 
 void
-SocketReaderModule::do_start(const data_t&)
+SocketReaderModule::do_start(const CommandData_t&)
 {
   // Setup callbacks on all sourcemodels
   for (auto& [sourceid, source] : m_sources) {
@@ -194,7 +194,7 @@ SocketReaderModule::do_start(const data_t&)
 }
 
 void
-SocketReaderModule::do_stop(const data_t&)
+SocketReaderModule::do_stop(const CommandData_t&)
 {
   for (auto& reader : m_readers) {
     std::visit([](auto& reader) { reader.stop(); }, reader);

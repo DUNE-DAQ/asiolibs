@@ -108,13 +108,13 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   }
 
   for (auto* d2d_conn : mdal->get_connections()) {
-    if (d2d_conn->is_disabled(*(m_cfg->session()))) {
+    if (d2d_conn->is_disabled(*(m_cfg->get_session()))) {
       continue;
     }
 
     for (auto* nw_sender : d2d_conn->get_net_senders()) {
       
-      if (nw_sender->is_disabled(*(m_cfg->session()))) {
+      if (nw_sender->is_disabled(*(m_cfg->get_session()))) {
         continue;
       }
 
@@ -199,7 +199,7 @@ SocketWriterModule::consume_payload(GenericReceiverConcept::TypeErasedPayload pa
 }
 
 void
-SocketWriterModule::do_configure(const data_t&)
+SocketWriterModule::do_configure(const CommandData_t&)
 {
   // Register callbacks if operating in that mode.
   if (m_callback_mode) {
@@ -218,7 +218,7 @@ SocketWriterModule::do_configure(const data_t&)
 }
 
 void
-SocketWriterModule::do_start(const data_t&)
+SocketWriterModule::do_start(const CommandData_t&)
 {
   for (const auto& writer_config : m_writer_configs) {
     // Reset opmon variables
@@ -240,7 +240,7 @@ SocketWriterModule::do_start(const data_t&)
 }
 
 void
-SocketWriterModule::do_stop(const data_t&)
+SocketWriterModule::do_stop(const CommandData_t&)
 {
   if (!m_callback_mode) {
     m_run_marker.store(false);

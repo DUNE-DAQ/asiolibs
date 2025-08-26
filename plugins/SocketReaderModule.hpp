@@ -169,9 +169,9 @@ private:
   };
 
   // Commands
-  void do_configure(const data_t&);
-  void do_start(const data_t&);
-  void do_stop(const data_t&);
+  void do_configure(const CommandData_t&);
+  void do_start(const CommandData_t&);
+  void do_stop(const CommandData_t&);
 
   void generate_opmon_data() override;
 
