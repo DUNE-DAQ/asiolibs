@@ -50,10 +50,40 @@ common_config_obj.config_db = (
 )
 
 onebyone_local_emu_crt_bern_conf = copy.deepcopy(common_config_obj)
-onebyone_local_emu_crt_bern_conf.session = "local-emu-crt-bern-1x1-config"
+onebyone_local_emu_crt_bern_conf.session = "local-socket-1x1-config"
 
 onebyone_local_emu_crt_grenoble_conf = copy.deepcopy(common_config_obj)
-onebyone_local_emu_crt_grenoble_conf.session = "local-emu-crt-grenoble-1x1-config"
+onebyone_local_emu_crt_grenoble_conf.session = "local-socket-1x1-config"
+
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.list_element_substitution(
+        obj_class="CRTReaderApplication",
+        obj_id="crt-data-source-01",
+        rel_name="queue_rules",
+        list_index=0,
+        replacement_object_class="QueueConnectionRule",
+        replacement_object_id="crt-grenoble-raw-data-rule"
+    )
+)
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.list_element_substitution(
+        obj_class="ReadoutApplication",
+        obj_id="socket-ru-01",
+        rel_name="queue_rules",
+        list_index=1,
+        replacement_object_class="QueueConnectionRule",
+        replacement_object_id="crt-grenoble-callback-raw-data-rule"
+    )
+)
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="ReadoutApplication",
+        obj_id="socket-ru-01",
+        rel_name="link_handler",
+        replacement_object_class="DataHandlerConf",
+        replacement_object_id="def-crt-grenoble-link-handler"
+    )
+)
 
 def host_is_at_ehn1(hostname):
     return re.match(r"^(np02|np04)-srv-\d{3}$", hostname) or re.match(r"^(np02|np04)-srv-\d{3}.cern.ch$", hostname)
