@@ -3,6 +3,7 @@ import os
 import re
 import copy
 
+from daqconf.utils import find_free_port
 import integrationtest.data_file_checks as data_file_checks
 import integrationtest.log_file_checks as log_file_checks
 import integrationtest.data_classes as data_classes
@@ -52,9 +53,25 @@ common_config_obj.config_db = (
 onebyone_local_emu_crt_bern_conf = copy.deepcopy(common_config_obj)
 onebyone_local_emu_crt_bern_conf.session = "local-socket-1x1-config"
 
+new_port = find_free_port()
+onebyone_local_emu_crt_bern_conf.config_substitutions.append(
+    data_classes.attribute_substitution(
+        obj_class="SocketDataSender",
+        obj_id="socket_sender_crt",
+        updates={"port": new_port},
+    )
+)
 onebyone_local_emu_crt_grenoble_conf = copy.deepcopy(common_config_obj)
 onebyone_local_emu_crt_grenoble_conf.session = "local-socket-1x1-config"
 
+new_port = find_free_port()
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.attribute_substitution(
+        obj_class="SocketDataSender",
+        obj_id="socket_sender_crt",
+        updates={"port": new_port},
+    )
+)
 onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
     data_classes.list_element_substitution(
         obj_class="CRTReaderApplication",
