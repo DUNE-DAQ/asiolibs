@@ -33,6 +33,8 @@
 
 namespace dunedaq::asiolibs {
 
+std::atomic<int64_t> SocketWriterModule::m_num_sends_in_flight = 0;
+
 SocketWriterModule::SocketWriterModule(const std::string& name)
   : DAQModule(name)
   , m_work_guard(boost::asio::make_work_guard(m_io_context))
@@ -192,6 +194,7 @@ void
 SocketWriterModule::consume_payload(GenericReceiverConcept::TypeErasedPayload payload)
 {
   for (auto& writer : m_writers) {
+    ++m_num_sends_in_flight;
     std::visit([this, payload](auto& w) mutable { // lets payload to be moved
       boost::asio::co_spawn(m_io_context, w.start(std::move(payload)), boost::asio::detached);
     }, writer);
@@ -249,11 +252,20 @@ SocketWriterModule::do_stop(const CommandData_t&)
     }
   }
 
+  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+  for (int idx = 0; idx < 100; ++idx) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    TLOG_DEBUG(0) << "KAB" << idx << " " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+    if (m_num_sends_in_flight < 10) {break;}
+  }
+
   for (auto& writer : m_writers) {
     std::visit([](auto& writer) { writer.stop(); }, writer);
   }
 
+  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
   m_work_guard.reset();
+  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
 }
 
 void
@@ -307,6 +319,7 @@ SocketWriterModule::TCPWriter::start(GenericReceiverConcept::TypeErasedPayload p
   ++m_socket_stats->sum_payloads;
   m_socket_stats->sum_bytes.fetch_add(bytes_sent);
   ++m_socket_stats->stats_packet_count;
+  --m_num_sends_in_flight;
 }
 
 void
@@ -341,7 +354,8 @@ SocketWriterModule::UDPWriter::start(GenericReceiverConcept::TypeErasedPayload p
   ++m_writer_config.socket_stats->num_payloads;
   ++m_writer_config.socket_stats->sum_payloads;
   m_writer_config.socket_stats->sum_bytes.fetch_add(bytes_sent);
-  ++m_writer_config.socket_stats->stats_packet_count;  
+  ++m_writer_config.socket_stats->stats_packet_count;
+  --m_num_sends_in_flight;
 }
 
 void

@@ -280,6 +280,8 @@ private:
    */    
   std::atomic<bool> m_run_marker { false };
 
+  static std::atomic<int64_t> m_num_sends_in_flight;
+
   // Consume callback
   /**
    * @brief Raw data consume callback
