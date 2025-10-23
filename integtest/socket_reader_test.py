@@ -61,6 +61,8 @@ onebyone_local_emu_crt_bern_conf.config_substitutions.append(
         updates={"port": new_port},
     )
 )
+print(f"Updated the crt_bern socket_sender to use port {new_port}")
+
 onebyone_local_emu_crt_grenoble_conf = copy.deepcopy(common_config_obj)
 onebyone_local_emu_crt_grenoble_conf.session = "local-socket-1x1-config"
 
@@ -72,6 +74,7 @@ onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
         updates={"port": new_port},
     )
 )
+print(f"Updated the crt_grenoble socket_sender to use port {new_port}")
 onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
     data_classes.list_element_substitution(
         obj_class="CRTReaderApplication",
