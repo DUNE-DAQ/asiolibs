@@ -253,8 +253,8 @@ SocketWriterModule::do_stop(const CommandData_t&)
   }
 
   TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
-  for (int idx = 0; idx < 100; ++idx) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  for (int idx = 0; idx < 500; ++idx) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     TLOG_DEBUG(0) << "KAB" << idx << " " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
     if (m_num_sends_in_flight < 10) {break;}
   }
