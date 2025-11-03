@@ -195,6 +195,9 @@ SocketWriterModule::consume_payload(GenericReceiverConcept::TypeErasedPayload pa
 {
   for (auto& writer : m_writers) {
     ++m_num_sends_in_flight;
+    if ((m_num_sends_in_flight % 100000) == 0) {
+      TLOG_DEBUG(0) << "consume_payload_TRACING " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+    }
     std::visit([this, payload](auto& w) mutable { // lets payload to be moved
       boost::asio::co_spawn(m_io_context, w.start(std::move(payload)), boost::asio::detached);
     }, writer);
@@ -252,10 +255,10 @@ SocketWriterModule::do_stop(const CommandData_t&)
     }
   }
 
-  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+  TLOG_DEBUG(0) << "do_stop_TRACING " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
   for (int idx = 0; idx < 500; ++idx) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    TLOG_DEBUG(0) << "KAB" << idx << " " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+    TLOG_DEBUG(0) << "do_stop_TRACING" << idx << " " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
     if (m_num_sends_in_flight < 10) {break;}
   }
 
@@ -263,9 +266,9 @@ SocketWriterModule::do_stop(const CommandData_t&)
     std::visit([](auto& writer) { writer.stop(); }, writer);
   }
 
-  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+  TLOG_DEBUG(0) << "do_stop_TRACING " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
   m_work_guard.reset();
-  TLOG_DEBUG(0) << "KAB " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
+  TLOG_DEBUG(0) << "do_stop_TRACING " << __LINE__ << " num_sends_in_flight=" << m_num_sends_in_flight;
 }
 
 void
