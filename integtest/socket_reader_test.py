@@ -38,7 +38,6 @@ grenoble_crt_frag_params = {
 ignored_logfile_problems = {
     "local-connection-server": [
         "errorlog: -",
-        r"Worker \(pid:\d+\) was sent SIGHUP"
     ],    
 }
 
