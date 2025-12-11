@@ -16,6 +16,8 @@
 #include "fdreadoutlibs/TDEFrameTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
+#include "ndreadoutlibs/NDReadoutPACMANTypeAdapter.hpp"
+#include "ndreadoutlibs/NDReadoutMPDTypeAdapter.hpp"
 
 #include <memory>
 #include <string>
@@ -26,6 +28,9 @@ DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::DUNEWIBEthTypeAdapter, "WIBEt
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::TDEFrameTypeAdapter, "TDEFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::ndreadoutlibs::types::NDReadoutPACMANTypeAdapter, "PACMANFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::ndreadoutlibs::types::NDReadoutMPDTypeAdapter, "MPDFrame")
+
 
 namespace asiolibs {
 
@@ -84,8 +89,17 @@ createSourceModel(const std::string& conn_uid, bool callback_mode)
     source_model->set_sink_name(conn_uid);
     source_model->set_sink(conn_uid, callback_mode);
     return source_model;
-  }
-
+  } else if (raw_dt.find("PACMANFrame") != std::string::npos) {
+      auto source_model = std::make_shared<SourceModel<dunedaq::ndreadoutlibs::types::NDReadoutPACMANTypeAdapter>>();
+      source_model->set_sink_name(conn_uid);
+      source_model->set_sink(conn_uid, callback_mode);
+      return source_model;
+  } else if (raw_dt.find("MPDFrame") != std::string::npos) {
+      auto source_model = std::make_shared<SourceModel<dunedaq::ndreadoutlibs::types::NDReadoutMPDTypeAdapter>>();
+      source_model->set_sink_name(conn_uid);
+      source_model->set_sink(conn_uid, callback_mode);
+      return source_model;
+    }
   return nullptr;
 }
 

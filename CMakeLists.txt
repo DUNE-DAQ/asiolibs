@@ -17,7 +17,7 @@ daq_protobuf_codegen(opmon/*.proto)
 
 ##############################################################################
 # Dependency sets
-set(DUNEDAQ_DEPENDENCIES datahandlinglibs::datahandlinglibs fddetdataformats::fddetdataformats fdreadoutlibs::fdreadoutlibs ers::ers)
+set(DUNEDAQ_DEPENDENCIES datahandlinglibs::datahandlinglibs nddetdataformats::nddetdataformats ndreadoutlibs::ndreadoutlibs fddetdataformats::fddetdataformats fdreadoutlibs::fdreadoutlibs ers::ers)
 
 ##############################################################################
 # Main library

@@ -35,6 +35,15 @@ grenoble_crt_frag_params = {
     "max_size_bytes": 3992,
 }
 
+pacman_frag_params = {
+    "fragment_type_description": "PACMAN",
+    "fragment_type": "PACMAN",
+    "expected_fragment_count": number_of_data_producers,
+    "min_size_bytes": 80,
+    "max_size_bytes": 1048656,
+}
+
+
 ignored_logfile_problems = {
     "local-connection-server": [
         "errorlog: -",
@@ -100,6 +109,51 @@ onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
         replacement_object_id="def-crt-grenoble-link-handler"
     )
 )
+
+# PACMAN
+onebyone_local_emu_pacman_conf = copy.deepcopy(common_config_obj)
+onebyone_local_emu_pacman_conf.session = "local-socket-1x1-config"
+new_port = find_free_port()
+
+onebyone_local_emu_pacman_conf.config_substitutions.append(
+    data_classes.attribute_substitution(
+        obj_class="SocketDataSender",
+        obj_id="socket_sender_pacman",
+        updates={"port": new_port},
+    )
+)
+onebyone_local_emu_pacman_conf.config_substitutions.append(
+    data_classes.list_element_substitution(
+        obj_class="ReadoutApplication",
+        obj_id="pacman-data-source-01",
+        rel_name="queue_rules",
+        list_index=0,
+        replacement_object_class="QueueConnectionRule",
+        replacement_object_id="pacman-raw-data-rule"
+    )
+)
+onebyone_local_emu_pacman_conf.config_substitutions.append(
+    data_classes.list_element_substitution(
+        obj_class="ReadoutApplication",
+        obj_id="socket-ru-01",
+        rel_name="queue_rules",
+        list_index=1,
+        replacement_object_class="QueueConnectionRule",
+        replacement_object_id="pacman-callback-raw-data-rule"
+    )
+)
+onebyone_local_emu_pacman_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="ReadoutApplication",
+        obj_id="socket-ru-01",
+        rel_name="link_handler",
+        replacement_object_class="DataHandlerConf",
+        replacement_object_id="def-pacman-link-handler"
+    )
+)
+
+
+# ------
 
 def host_is_at_ehn1(hostname):
     return re.match(r"^(np02|np04)-srv-\d{3}$", hostname) or re.match(r"^(np02|np04)-srv-\d{3}.cern.ch$", hostname)

@@ -13,6 +13,8 @@
 
 #include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
+#include "ndreadoutlibs/NDReadoutPACMANTypeAdapter.hpp"
+#include "ndreadoutlibs/NDReadoutMPDTypeAdapter.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
@@ -20,6 +22,8 @@
 
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::ndreadoutlibs::types::NDReadoutPACMANTypeAdapter, "PACMANFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::ndreadoutlibs::types::NDReadoutMPDTypeAdapter, "MPDFrame")
 
 namespace dunedaq::asiolibs {
  
@@ -39,6 +43,13 @@ createGenericReceiver(const std::string& conn_uid, const std::string& raw_data_r
     return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTBernTypeAdapter>>(raw_data_receiver_connection_name);
   } else if (raw_dt.find("CRTGrenobleFrame") != std::string::npos) {
     return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>(raw_data_receiver_connection_name);
+  }
+  else if (raw_dt.find("PACMANFrame") != std::string::npos){
+    return std::make_shared<GenericReceiverModel<dunedaq::ndreadoutlibs::types::NDReadoutPACMANTypeAdapter>>(raw_data_receiver_connection_name);
+  }
+  else if (raw_dt.find("MPDFrame") != std::string::npos)
+  {
+    return std::make_shared<GenericReceiverModel<dunedaq::ndreadoutlibs::types::NDReadoutMPDTypeAdapter>>(raw_data_receiver_connection_name);
   }
 
   return nullptr;
