@@ -18,7 +18,6 @@
 #include "asiolibs/opmon/SourceModel.pb.h"
 
 // #include "datahandlinglibs/utils/ReusableThread.hpp"
-#include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
 #include "datahandlinglibs/utils/BufferCopy.hpp" 
 
 // #include <folly/ProducerConsumerQueue.h>
@@ -49,35 +48,15 @@ public:
   {}
   ~SourceModel() {}
 
-  void set_sink(const std::string& sink_name, bool callback_mode) override
+  void set_sink(const std::string& sink_name) override
   {
-    m_callback_mode = callback_mode;
-    if (callback_mode) {
-      TLOG_DEBUG(5) << "Callback mode requested. Won't acquire iom sender!";
-    } else {
       if (m_sink_is_set) {
         TLOG_DEBUG(5) << "SourceModel sink is already set in initialized!";
       } else {
         m_sink_queue = get_iom_sender<TargetPayloadType>(sink_name);
         m_sink_is_set = true;
       }
-    }
-  }
 
-  void acquire_callback() override
-  {
-    if (m_callback_mode) {
-      if (m_callback_is_acquired) {
-        TLOG_DEBUG(5) << "SourceModel callback is already acquired!";
-      } else {
-        // Getting DataMoveCBRegistry
-        auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
-        m_sink_callback = dmcbr->get_callback<TargetPayloadType>(inherited::m_sink_name);
-        m_callback_is_acquired = true;
-      }
-    } else {
-      TLOG_DEBUG(5) << "Won't acquire callback, as IOM sink is set!";
-    }
   }
 
   std::shared_ptr<sink_t>& get_sink() { return m_sink_queue; }
@@ -89,16 +68,12 @@ public:
 
       TargetPayloadType& target_payload = *reinterpret_cast<TargetPayloadType*>(message);
   
-      if (m_callback_mode) {
-        (*m_sink_callback)(std::move(target_payload));
-      } else {
         if (!m_sink_queue->try_send(std::move(target_payload), iomanager::Sender::s_no_block)) {
           //if(m_dropped_packets == 0 || m_dropped_packets%10000) {
           //  TLOG() << "Dropped data " << m_dropped_packets;
           //}
           ++m_dropped_packets;
         }
-      }
 
     } else {
       TargetPayloadType target_payload;
@@ -127,12 +102,6 @@ private:
   std::string m_sink_id;
   bool m_sink_is_set{ false };
   std::shared_ptr<sink_t> m_sink_queue;
-
-  // Callback internals
-  bool m_callback_mode;
-  bool m_callback_is_acquired{ false };
-  using sink_cb_t = std::shared_ptr<std::function<void(TargetPayloadType&&)>>;
-  sink_cb_t m_sink_callback;
 
   std::atomic<uint64_t> m_dropped_packets{0};
 

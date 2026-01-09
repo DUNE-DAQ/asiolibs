@@ -20,7 +20,6 @@
 #include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
-#include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
 
 #include "asiolibs/opmon/SocketWriterModule.pb.h"
 
@@ -207,8 +206,8 @@ SocketWriterModule::do_configure(const CommandData_t&)
     m_consume_callback = std::bind(&SocketWriterModule::consume_payload, this, std::placeholders::_1);
  
     // Register callback
-    auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
-    dmcbr->register_callback<GenericReceiverConcept::TypeErasedPayload>(m_raw_data_receiver_connection_name, m_consume_callback);
+    auto dmcbr = iomanager::IOManager::get();
+    dmcbr->add_callback<GenericReceiverConcept::TypeErasedPayload>(m_raw_data_receiver_connection_name, m_consume_callback);
   }
 
   for (std::size_t i = 0; i < m_writers.size(); ++i) {

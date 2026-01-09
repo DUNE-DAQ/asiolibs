@@ -140,18 +140,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
       throw err;
     }
 
-    // Check for CB prefix indicating Callback use
-    const char delim = '_';
-    const std::string target = queue->UID();
-    std::vector<std::string> words;
-    tokenize(target, delim, words);
-
-    bool callback_mode = false;
-    if (words.front() == "cb") {
-      callback_mode = true;
-    }
-
-    auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
+    auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID());
     register_node(queue->UID(), ptr);
   }  
 }
@@ -179,11 +168,6 @@ SocketReaderModule::do_configure(const CommandData_t&)
 void
 SocketReaderModule::do_start(const CommandData_t&)
 {
-  // Setup callbacks on all sourcemodels
-  for (auto& [sourceid, source] : m_sources) {
-    source->acquire_callback();
-  }
-
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 
   for (auto& reader : m_readers) {
