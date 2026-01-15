@@ -101,9 +101,6 @@ onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
     )
 )
 
-def host_is_at_ehn1(hostname):
-    return re.match(r"^(np02|np04)-srv-\d{3}$", hostname) or re.match(r"^(np02|np04)-srv-\d{3}.cern.ch$", hostname)
-
 confgen_arguments = {
     "Local Emu CRT Bern 1x1 Conf": onebyone_local_emu_crt_bern_conf,
     "Local Emu CRT Grenoble 1x1 Conf": onebyone_local_emu_crt_grenoble_conf,
@@ -128,22 +125,10 @@ def test_nanorc_success(run_nanorc):
     print(current_test)
     print(banner_line)    
 
-    if not host_is_at_ehn1(hostname) and "EHN1" in current_test:
-        pytest.skip(
-            f"This computer ({hostname}) is not at EHN1, not running EHN1 sessions"
-        )
-
     # Check that nanorc completed correctly
     assert run_nanorc.completed_process.returncode == 0 
 
 def test_log_files(run_nanorc):
-    current_test = os.environ.get("PYTEST_CURRENT_TEST")
-
-    if not host_is_at_ehn1(hostname) and "EHN1" in current_test:
-        pytest.skip(
-            f"This computer ({hostname}) is not at EHN1, not running EHN1 sessions"
-        )
-
     if check_for_logfile_errors:
         # Check that there are no warnings or errors in the log files
         assert log_file_checks.logs_are_error_free(
