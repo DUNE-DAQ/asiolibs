@@ -46,7 +46,7 @@ common_config_obj.dro_map_config.n_streams = number_of_data_producers
 common_config_obj.dro_map_config.n_apps = number_of_readout_apps
 common_config_obj.op_env = "test"
 common_config_obj.config_db = (
-    os.path.dirname(__file__) + "/../../daqsystemtest/config/daqsystemtest/example-configs.data.xml"
+    os.environ.get("DAQSYSTEMTEST_SHARE") + "/config/daqsystemtest/example-configs.data.xml"
 )
 
 onebyone_local_emu_crt_bern_conf = copy.deepcopy(common_config_obj)
