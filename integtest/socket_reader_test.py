@@ -45,8 +45,14 @@ common_config_obj = data_classes.drunc_config()
 common_config_obj.dro_map_config.n_streams = number_of_data_producers
 common_config_obj.dro_map_config.n_apps = number_of_readout_apps
 common_config_obj.op_env = "test"
+# 22-Jan-2026, KAB: added the use of the DAQSYSTEMTEST_SHARE env var as part of
+# specifying the location of the example-configs.data.xml file.  This is more
+# reliable than using a relative path to a parallel directory with the daqsystemtest
+# code in it.  Of course, this new model has the feature that users will need to
+# rebuild their software area if they make changes to the configuration entities
+# in a local copy of the daqsystemtest repo before this code will see those changes.
 common_config_obj.config_db = (
-    os.path.dirname(__file__) + "/../../daqsystemtest/config/daqsystemtest/example-configs.data.xml"
+    os.environ.get("DAQSYSTEMTEST_SHARE") + "/config/daqsystemtest/example-configs.data.xml"
 )
 
 onebyone_local_emu_crt_bern_conf = copy.deepcopy(common_config_obj)
