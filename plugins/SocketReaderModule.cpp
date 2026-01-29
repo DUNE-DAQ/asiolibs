@@ -125,34 +125,11 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
     }
   }
 
-  if (mdal->get_outputs().empty()) {
-    auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No outputs defined for socket reader in configuration.");
-    ers::fatal(err);
-    throw err;
-  }
+  auto callback_confs = mdal->get_raw_data_callbacks();
+  for (auto* callback_conf : callback_confs) {
 
-  for (auto* con : mdal->get_outputs()) {
-    auto* queue = con->cast<confmodel::QueueWithSourceId>();
-    if (queue == nullptr) {
-      auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
-      ers::fatal(err);
-      throw err;
-    }
-
-    // Check for CB prefix indicating Callback use
-    const char delim = '_';
-    const std::string target = queue->UID();
-    std::vector<std::string> words;
-    tokenize(target, delim, words);
-
-    bool callback_mode = false;
-    if (words.front() == "cb") {
-      callback_mode = true;
-    }
-
-    auto ptr = m_sources[queue->get_source_id()] = createSourceModel(queue->UID(), callback_mode);
-    register_node(queue->UID(), ptr);
+    auto ptr = m_sources[callback_conf->get_source_id()] = createSourceModel(callback_conf);
+    register_node(callback_conf->UID(), ptr);
   }  
 }
 
