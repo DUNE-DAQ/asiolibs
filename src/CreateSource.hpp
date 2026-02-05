@@ -30,7 +30,7 @@ DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTG
 namespace asiolibs {
 
 std::shared_ptr<SourceConcept>
-createSourceModel(const appmodel::RawDataCallbackConf* conf)
+createSourceModel(const appmodel::DataMoveCallbackConf* conf)
 {
   auto datatype = conf->get_data_type();
   TLOG() << "Choosing specializations for SourceModel for output connection "

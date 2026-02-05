@@ -240,7 +240,7 @@ private:
   /**
    * @brief Configuration object for the callbacks
    */
-  const appmodel::RawDataCallbackConf* m_callback_conf;
+  const appmodel::DataMoveCallbackConf* m_callback_conf;
 
   // Consume callback
   /**

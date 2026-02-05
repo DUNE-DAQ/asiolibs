@@ -16,7 +16,7 @@
 
 #include "opmonlib/MonitorableObject.hpp"
 #include "appfwk/DAQModule.hpp"
-#include "appmodel/RawDataCallbackConf.hpp"
+#include "appmodel/DataMoveCallbackConf.hpp"
 //#include "packetformat/detail/block_parser.hpp"
 #include <nlohmann/json.hpp>
 
@@ -47,12 +47,12 @@ namespace dunedaq {
       virtual bool handle_payload(char* message, std::size_t size) = 0;
       virtual std::size_t get_target_payload_size() const = 0;
 
-      void set_sink_config(const appmodel::RawDataCallbackConf* sink_conf) 
+      void set_sink_config(const appmodel::DataMoveCallbackConf* sink_conf) 
       { 
 	m_sink_conf = sink_conf; 
       }
 
-      const appmodel::RawDataCallbackConf* m_sink_conf;
+      const appmodel::DataMoveCallbackConf* m_sink_conf;
     };
 
   } // namespace asiolibs
