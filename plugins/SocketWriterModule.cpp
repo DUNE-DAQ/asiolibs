@@ -42,57 +42,6 @@ SocketWriterModule::SocketWriterModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
-void 
-SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal)
-{
-  if (mdal->get_inputs().empty()) {
-    auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No inputs defined for socket writer in configuration.");
-    ers::fatal(err);
-    throw err;
-  }
-
-  for (auto* input : mdal->get_inputs()) {
-    m_raw_data_receiver_connection_name = input->UID();
-    // Parse for prefix
-    std::string conn_name = input->UID(); 
-    const char delim = '_';
-    std::vector<std::string> words;
-    std::size_t start;
-    std::size_t end = 0;
-    while ((start = conn_name.find_first_not_of(delim, end)) != std::string::npos) {
-      end = conn_name.find(delim, start);
-      words.push_back(conn_name.substr(start, end - start));
-    }
-
-    TLOG_DEBUG() << "Initialize connection based on uid: " 
-                 << m_raw_data_receiver_connection_name << " front word: " << words.front();
-
-    std::string cb_prefix("cb");
-    if (words.front() == cb_prefix) {
-      m_callback_mode = true;
-    }
-
-    if (!m_callback_mode) {
-      const auto recv_timeout_ms = input->get_recv_timeout_ms();
-      if (recv_timeout_ms == 0) {
-        ers::warning(InvalidRawReceiverTimeout(ERS_HERE, m_raw_receiver_timeout_ms.count()));
-      } else {
-        m_raw_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
-      }
-    }
-
-    auto* queue = input->cast<confmodel::QueueWithSourceId>();
-    if (queue == nullptr) {
-      auto err = dunedaq::datahandlinglibs::InitializationError(ERS_HERE, "Inputs are not of type QueueWithGeoId.");
-      ers::fatal(err);
-      throw err;
-    }  
-
-    m_raw_data_receiver = createGenericReceiver(queue->UID(), m_raw_data_receiver_connection_name); // FIXME (DTE): Overwriting doesn't make sense      
-  }    
-}
-
 void
 SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
@@ -100,6 +49,7 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto* mdal = m_cfg->get_dal<appmodel::SocketDataWriterModule>(get_name());
   auto* module_conf = mdal->get_configuration()->cast<appmodel::SocketWriterConf>();
 
+  m_callback_conf = mdal->get_raw_data_callback();
   const auto remote_ip = module_conf->get_remote_ip();
 
   m_socket_type = string_to_socket_type(module_conf->get_socket_type());
@@ -113,7 +63,7 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
     }
 
     for (auto* nw_sender : d2d_conn->get_net_senders()) {
-      
+
       if (nw_sender->is_disabled(*(m_cfg->get_session()))) {
         continue;
       }
@@ -148,13 +98,11 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
     }
   }
 
-  get_dal_inputs(mdal);
-
   // Raw input connection sensibility check
-  if (!m_callback_mode && m_raw_data_receiver == nullptr) {
-    TLOG() << "Non callback mode, and receiver is unset!";
-    //ers::error(ConfigurationError(ERS_HERE, m_sourceid, "Non callback mode, and receiver is unset!"));
-  }  
+  if (m_callback_conf == nullptr) {
+    TLOG() << "No callback configuration given!";
+    //ers::error(ConfigurationError(ERS_HERE, m_sourceid, No callback configuration given!"));
+  }
 }
 
 SocketWriterModule::SocketType
@@ -166,26 +114,6 @@ SocketWriterModule::string_to_socket_type(const std::string& socket_type) const
     return SocketWriterModule::SocketType::UDP;
   }
   return SocketWriterModule::SocketType::INVALID;
-}
-
-void 
-SocketWriterModule::run_consume()
-{
-  TLOG() << "Consumer thread started..."; // TODO (DTE): Make debug logs
-
-  while (m_run_marker.load()) {
-    // Try to acquire data
-
-    if (auto opt_payload = m_raw_data_receiver->try_receive(m_raw_receiver_timeout_ms)) {
-      consume_payload(std::move(*opt_payload));
-    } else {
-      for (const auto& writer_config : m_writer_configs) {
-        ++writer_config.socket_stats->rawq_timeout_count;
-      }
-    }
-  }
-
-  TLOG() << "Consumer thread joins... ";
 }
 
 void
@@ -201,15 +129,12 @@ SocketWriterModule::consume_payload(GenericReceiverConcept::TypeErasedPayload pa
 void
 SocketWriterModule::do_configure(const CommandData_t&)
 {
-  // Register callbacks if operating in that mode.
-  if (m_callback_mode) {
     // Configure and register consume callback
     m_consume_callback = std::bind(&SocketWriterModule::consume_payload, this, std::placeholders::_1);
- 
+
     // Register callback
     auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
-    dmcbr->register_callback<GenericReceiverConcept::TypeErasedPayload>(m_raw_data_receiver_connection_name, m_consume_callback);
-  }
+    dmcbr->register_callback<GenericReceiverConcept::TypeErasedPayload>(m_callback_conf, m_consume_callback);
 
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
     const auto& writer_config = m_writer_configs[i];
@@ -229,12 +154,7 @@ SocketWriterModule::do_start(const CommandData_t&)
     writer_config.socket_stats->stats_packet_count = 0;
   }
 
-  m_t0 = std::chrono::high_resolution_clock::now();
-
-  if (!m_callback_mode) {
-    m_run_marker.store(true);
-    m_consumer_thread.set_work(&SocketWriterModule::run_consume, this);
-  }
+  m_t0 = std::chrono::steady_clock::now();
 
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 }
@@ -242,13 +162,6 @@ SocketWriterModule::do_start(const CommandData_t&)
 void
 SocketWriterModule::do_stop(const CommandData_t&)
 {
-  if (!m_callback_mode) {
-    m_run_marker.store(false);
-    while (!m_consumer_thread.get_readiness()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-  }
-
   for (auto& writer : m_writers) {
     std::visit([](auto& writer) { writer.stop(); }, writer);
   }
@@ -266,7 +179,7 @@ SocketWriterModule::generate_opmon_data()
     stats.set_sum_bytes(writer_config.socket_stats->sum_bytes.load());
     stats.set_num_data_input_timeouts(writer_config.socket_stats->rawq_timeout_count.exchange(0));
 
-    auto now = std::chrono::high_resolution_clock::now();
+    auto now = std::chrono::steady_clock::now();
     int new_packets = writer_config.socket_stats->stats_packet_count.exchange(0);
     double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
     m_t0 = now;
@@ -341,7 +254,7 @@ SocketWriterModule::UDPWriter::start(GenericReceiverConcept::TypeErasedPayload p
   ++m_writer_config.socket_stats->num_payloads;
   ++m_writer_config.socket_stats->sum_payloads;
   m_writer_config.socket_stats->sum_bytes.fetch_add(bytes_sent);
-  ++m_writer_config.socket_stats->stats_packet_count;  
+  ++m_writer_config.socket_stats->stats_packet_count;
 }
 
 void

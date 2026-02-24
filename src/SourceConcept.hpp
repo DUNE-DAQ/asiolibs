@@ -16,6 +16,7 @@
 
 #include "opmonlib/MonitorableObject.hpp"
 #include "appfwk/DAQModule.hpp"
+#include "appmodel/DataMoveCallbackConf.hpp"
 //#include "packetformat/detail/block_parser.hpp"
 #include <nlohmann/json.hpp>
 
@@ -38,7 +39,6 @@ namespace dunedaq {
       SourceConcept& operator=(SourceConcept&&) = delete;      ///< SourceConcept is not move-assignable
 
       //  virtual void init(const nlohmann::json& args) = 0;
-      virtual void set_sink(const std::string& sink_name, bool callback_mode) = 0;
       virtual void acquire_callback() = 0;
       //  virtual void conf(const nlohmann::json& args) = 0;
       //  virtual void start(const nlohmann::json& args) = 0;
@@ -47,12 +47,12 @@ namespace dunedaq {
       virtual bool handle_payload(char* message, std::size_t size) = 0;
       virtual std::size_t get_target_payload_size() const = 0;
 
-      void set_sink_name(const std::string& sink_name) 
+      void set_sink_config(const appmodel::DataMoveCallbackConf* sink_conf) 
       { 
-	m_sink_name = sink_name; 
+	m_sink_conf = sink_conf; 
       }
 
-      std::string m_sink_name;
+      const appmodel::DataMoveCallbackConf* m_sink_conf;
     };
 
   } // namespace asiolibs

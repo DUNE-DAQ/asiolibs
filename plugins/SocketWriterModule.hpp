@@ -70,29 +70,29 @@ private:
     std::atomic<uint64_t> sum_payloads{ 0 };
 
     /**
-     * @brief Incremental number of received payloads 
+     * @brief Incremental number of received payloads
      */
-    std::atomic<uint64_t> num_payloads{ 0 };   
+    std::atomic<uint64_t> num_payloads{ 0 };
 
     /**
-     * @brief Total number of received bytes 
+     * @brief Total number of received bytes
      */
     std::atomic<uint64_t> sum_bytes{ 0 };
 
     /**
-     * @brief Timeout on data inputs 
+     * @brief Timeout on data inputs
      */
-    std::atomic<uint64_t> rawq_timeout_count{ 0 };    
+    std::atomic<uint64_t> rawq_timeout_count{ 0 };
 
     /**
-     * @brief Rate of consumed packets 
+     * @brief Rate of consumed packets
      */
     std::atomic<double> rate_payloads_consumed{ 0 };
-    
+
     /**
      * @brief Counts packets since last opmon data generation
      */
-    std::atomic<int> stats_packet_count{ 0 };    
+    std::atomic<int> stats_packet_count{ 0 };
   };
 
   struct WriterConfig
@@ -197,21 +197,10 @@ private:
   SocketType string_to_socket_type(const std::string& socket_type) const;
 
   /**
-   * @brief Gets dal inputs
-   * @param mdal SocketDataWriterModule dal
-   */   
-  void get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal);
-
-  /**
-   * @brief Raw data consume thread function
-   */   
-  void run_consume();
-
-  /**
    * @brief Raw data consume callback function
    * @param payload Consumed data
-   */  
-  void consume_payload(GenericReceiverConcept::TypeErasedPayload payload);  
+   */
+  void consume_payload(GenericReceiverConcept::TypeErasedPayload payload);
 
   /**
    * @brief I/O context for socket operations
@@ -249,48 +238,21 @@ private:
   std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
 
   /**
-   * @brief Whether callback mode is configured
-   */  
-  bool m_callback_mode{ false };
-
-  // RAW RECEIVER
-  /**
-   * @brief Generic raw data receiver
-   */  
-  std::shared_ptr<GenericReceiverConcept> m_raw_data_receiver;
-
-  /**
-   * @brief Raw data receiver timeout
-   */  
-  std::chrono::milliseconds m_raw_receiver_timeout_ms{ raw_receiver_timeout_ms };
-
-  /**
-   * @brief Raw data receiver UID
-   */  
-  std::string m_raw_data_receiver_connection_name;  
-
-  // CONSUMER
-  /**
-   * @brief Raw data consume thread
-   */     
-  utilities::ReusableThread m_consumer_thread;
-
-  /**
-   * @brief Whether consumer thread should continue
-   */    
-  std::atomic<bool> m_run_marker { false };
+   * @brief Configuration object for the callbacks
+   */
+  const appmodel::DataMoveCallbackConf* m_callback_conf;
 
   // Consume callback
   /**
    * @brief Raw data consume callback
-   */    
-  std::function<void(GenericReceiverConcept::TypeErasedPayload payload)> m_consume_callback;  
+   */
+  std::function<void(GenericReceiverConcept::TypeErasedPayload payload)> m_consume_callback;
 
   // RUN START T0
   /**
    * @brief Timestamp used to measure time between opmon reports
-   */   
-  std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;  
+   */
+  std::chrono::time_point<std::chrono::steady_clock> m_t0;
 };
 
 } // namespace dunedaq::asiolibs

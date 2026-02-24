@@ -30,26 +30,18 @@ DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTG
 namespace asiolibs {
 
 std::shared_ptr<SourceConcept>
-createSourceModel(const std::string& conn_uid, bool callback_mode)
+createSourceModel(const appmodel::DataMoveCallbackConf* conf)
 {
-  auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(conn_uid);
-  if (datatypes.size() != 1) {
-    ers::error(dunedaq::datahandlinglibs::GenericConfigurationError(ERS_HERE,
-      "Multiple output data types specified! Expected only a single type!"));
-  }
-  std::string raw_dt{ *datatypes.begin() };
+  auto datatype = conf->get_data_type();
   TLOG() << "Choosing specializations for SourceModel for output connection "
-         << " [uid:" << conn_uid << " , data_type:" << raw_dt << ']';
+         << " [uid:" << conf->UID() << " , data_type:" << datatype << ']';
 
-  if (raw_dt.find("WIBEthFrame") != std::string::npos) {
+  if (datatype.find("WIBEthFrame") != std::string::npos) {
     // Create Model
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::DUNEWIBEthTypeAdapter>>();
 
     // For callback acquisition later (lazy)
-    source_model->set_sink_name(conn_uid);
-
-    // Setup sink (acquire pointer from QueueRegistry)
-    source_model->set_sink(conn_uid, callback_mode);
+    source_model->set_sink_config(conf);
 
     // Get parser and sink
     //auto& parser = source_model->get_parser();
@@ -66,23 +58,20 @@ createSourceModel(const std::string& conn_uid, bool callback_mode)
     // Return with setup model
     return source_model;
 
-  } else if (raw_dt.find("TDEFrame") != std::string::npos) {
+  } else if (datatype.find("TDEFrame") != std::string::npos) {
     // WIB2 specific char arrays
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::TDEFrameTypeAdapter>>();
-    source_model->set_sink_name(conn_uid);
-    source_model->set_sink(conn_uid, callback_mode);
+    source_model->set_sink_config(conf);
     //auto& parser = source_model->get_parser();
     //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::DUNEWIBSuperChunkTypeAdapter>(sink);
     return source_model;
-  } else if (raw_dt.find("CRTBernFrame") != std::string::npos) {
+  } else if (datatype.find("CRTBernFrame") != std::string::npos) {
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTBernTypeAdapter>>();
-    source_model->set_sink_name(conn_uid);
-    source_model->set_sink(conn_uid, callback_mode);
+    source_model->set_sink_config(conf);
     return source_model;
-  } else if (raw_dt.find("CRTGrenobleFrame") != std::string::npos) {
+  } else if (datatype.find("CRTGrenobleFrame") != std::string::npos) {
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>();
-    source_model->set_sink_name(conn_uid);
-    source_model->set_sink(conn_uid, callback_mode);
+    source_model->set_sink_config(conf);
     return source_model;
   }
 
