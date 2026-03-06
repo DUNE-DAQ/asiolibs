@@ -24,16 +24,16 @@ DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTG
 namespace dunedaq::asiolibs {
  
 std::shared_ptr<GenericReceiverConcept>
-createGenericReceiver(const std::string& conn_uid, const std::string& raw_data_receiver_connection_name)
+createGenericReceiver(const std::string& raw_data_receiver_connection_name)
 {
-  const auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(conn_uid);
+  const auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(raw_data_receiver_connection_name);
   if (datatypes.size() != 1) {
-    ers::error(dunedaq::datahandlinglibs::GenericConfigurationError(ERS_HERE,
-      "Multiple output data types specified! Expected only a single type!"));
+    ers::error(datahandlinglibs::GenericConfigurationError(ERS_HERE,
+      "Multiple input data types specified! Expected only a single type!"));
   }
   const std::string raw_dt = *datatypes.begin();
-  TLOG() << "Choosing specializations for GenericReceiverConcept for output connection "
-         << " [uid:" << conn_uid << " , data_type:" << raw_dt << ']';
+  TLOG() << "Choosing specializations for GenericReceiverConcept for input connection "
+         << " [uid:" << raw_data_receiver_connection_name << " , data_type:" << raw_dt << ']';
 
   if (raw_dt.find("CRTBernFrame") != std::string::npos) {
     return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTBernTypeAdapter>>(raw_data_receiver_connection_name);

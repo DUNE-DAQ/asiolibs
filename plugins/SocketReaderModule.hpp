@@ -22,11 +22,13 @@ namespace dunedaq::asiolibs {
 
 class SourceConcept;
 
-using sid_to_source_map_t = std::map<int, std::shared_ptr<SourceConcept>>;
-
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
 public:
+  using sender_t = std::pair<std::string, uint32_t>;
+  using sender_stream_pair_t = std::pair<sender_t, uint32_t>;
+  using sender_source_map_t = std::map<sender_stream_pair_t, std::shared_ptr<SourceConcept>>;
+
   /**
    * @brief SocketReaderModule constructor
    * @param name DAQ module instance name
@@ -64,9 +66,14 @@ private:
      * @brief Received bytes
      */
     std::atomic<uint64_t> bytes_received{ 0 };
+
+    /**
+     * @brief Counts packets since last opmon data generation
+     */
+    std::atomic<int> stats_packet_count{ 0 };        
   };
 
-  struct ReaderConfig
+  struct ReaderInfo
   {
     /**
      * @brief Source IP address
@@ -76,12 +83,7 @@ private:
     /**
      * @brief Source port number
      */
-    ushort local_port;
-
-    /**
-     * @brief Detector stream source ID
-     */
-    uint source_id;
+    uint32_t local_port;
 
     /**
      * @brief Statistics of socket traffic
@@ -95,17 +97,17 @@ private:
     /**
      * @brief Asynchronously creates and connects a TCP socket
      * @param io_context I/O context for socket creation
-     * @param reader_config TCP reader configuration
+     * @param reader_info TCP reader info
      * @throws boost::system::system_error on failure
      */
-    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<ReaderInfo> reader_info);
 
     /**
      * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources);
+    boost::asio::awaitable<void> start(const sender_source_map_t& sender_to_source);
 
     /**
      * @brief Closes the socket
@@ -119,9 +121,9 @@ private:
     std::unique_ptr<boost::asio::ip::tcp::socket> m_socket;
 
     /**
-     * @brief Detector stream source ID
-     */
-    uint m_source_id;
+     * @brief Connected remote
+     */    
+    sender_t m_remote;
 
     /**
      * @brief Statistics of socket traffic
@@ -135,16 +137,16 @@ private:
     /**
      * @brief Creates a UDP socket
      * @param io_context I/O context for socket creation
-     * @param reader_config UDP reader configuration
+     * @param reader_info UDP reader info
      */
-    void configure(boost::asio::io_context& io_context, const ReaderConfig& reader_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<ReaderInfo> reader_info);
 
     /**
      * @brief Asynchronously receives payloads from the socket in a loop
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sid_to_source_map_t& sources);
+    boost::asio::awaitable<void> start(const sender_source_map_t& sender_to_source);
 
     /**
      * @brief Closes the socket
@@ -160,7 +162,7 @@ private:
     /**
      * @brief Detector stream source ID
      */
-    uint m_source_id;
+    uint32_t m_source_id;
 
     /**
      * @brief Statistics of socket traffic
@@ -195,7 +197,7 @@ private:
   /**
    * @brief Socket readers
    */
-  std::vector<std::variant<TCPReader, UDPReader>> m_readers;
+  std::vector<std::shared_ptr<std::variant<TCPReader, UDPReader>>> m_readers;
 
   /**
    * @brief Background thread to keep the I/O context running
@@ -203,26 +205,27 @@ private:
   std::jthread m_io_thread;
 
   /**
-   * @brief Type of socket
+   * @brief Socket reader infos
    */
-  SocketType m_socket_type{ SocketType::INVALID };
-
-  /**
-   * @brief Socket reader configurations
-   */
-  std::vector<ReaderConfig> m_reader_configs;
-
-  // Internals
-  /**
-   * @brief DAQ configuration data
-   */
-  std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
+  std::vector<std::shared_ptr<ReaderInfo>> m_reader_infos;
 
   // Sinks (SourceConcepts)
+  using sid_to_source_map_t = std::map<uint32_t, std::shared_ptr<SourceConcept>>;
   /**
    * @brief Data sources
    */
   sid_to_source_map_t m_sources;
+
+  /**
+   * @brief Map between a pair of {sender, stream} and the corresponding source
+   */    
+  sender_source_map_t m_sender_to_source;  
+
+  // RUN START T0
+  /**
+   * @brief Timestamp used to measure time between opmon reports
+   */   
+  std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;    
 };
 
 } // namespace dunedaq::asiolibs

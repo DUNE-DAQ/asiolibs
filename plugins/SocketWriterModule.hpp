@@ -32,7 +32,7 @@ public:
   /**
    * @brief Default raw data receiver timeout in ms
    */
-  static constexpr auto raw_receiver_timeout_ms = 10;
+  static constexpr auto default_raw_receiver_timeout_ms = 10;
 
   /**
    * @brief SocketWriterModule constructor
@@ -95,8 +95,18 @@ private:
     std::atomic<int> stats_packet_count{ 0 };    
   };
 
-  struct WriterConfig
+  struct WriterInfo
   {
+    /**
+     * @brief Source IP address
+     */
+    std::string local_ip;
+
+    /**
+     * @brief Source port number
+     */
+    uint32_t local_port;
+
     /**
      * @brief Destination IP address
      */
@@ -105,7 +115,7 @@ private:
     /**
      * @brief Destination port number
      */
-    ushort remote_port;
+    uint32_t remote_port;
 
     /**
      * @brief Statistics of socket traffic
@@ -118,25 +128,36 @@ private:
   public:
     /**
      * @brief Creates and connects a TCP socket
-     * @param io_context I/O context for socket creation
-     * @param writer_config TCP writer configuration
+     * @param io_context I/O context for socket creation and coroutine spawn
+     * @param writer_info TCP writer info
      * @throws boost::system::system_error on failure
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info);
 
     /**
-     * @brief Asynchronously sends payloads to the socket in a loop
+     * @brief Enqueues payload
      * @param payload Payload to send
-     * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericReceiverConcept::TypeErasedPayload payload);
 
     /**
      * @brief Closes the socket
      */
     void stop();
 
+    /**
+     * @brief Get socket statistics
+     * @return Statistics of socket traffic
+     */    
+    std::shared_ptr<SocketStats> get_socket_stats() const;    
+
   private:
+    /**
+     * @brief Asynchronously sends payloads to the socket in a loop
+     * @return Coroutine handle
+     */
+    boost::asio::awaitable<void> start();
+
     /**
      * @brief TCP socket
      */
@@ -146,6 +167,21 @@ private:
      * @brief Statistics of socket traffic
      */
     std::shared_ptr<SocketStats> m_socket_stats;
+
+    /**
+     * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
+     */
+    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+
+    /**
+    * @brief I/O context for socket operations
+    */
+    boost::asio::io_context* m_io_context;
+
+    /**
+    * @brief Ensures no race on queue
+    */    
+    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;
   };
 
   class UDPWriter
@@ -153,33 +189,64 @@ private:
   public:
     /**
      * @brief Creates a UDP socket
-     * @param io_context I/O context for socket creation
-     * @param writer_config UDP writer configuration
+     * @param io_context I/O context for socket creation and coroutine spawn
+     * @param writer_info UDP writer info
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info);
 
     /**
-     * @brief Asynchronously sends payloads to the socket in a loop
+     * @brief Enqueues payload
      * @param payload Payload to send
-     * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericReceiverConcept::TypeErasedPayload payload);
 
     /**
      * @brief Closes the socket
      */
     void stop();
 
+    /**
+     * @brief Get socket statistics
+     * @return Statistics of socket traffic
+     */    
+    std::shared_ptr<SocketStats> get_socket_stats() const;
+
   private:
+    /**
+     * @brief Asynchronously sends payloads to the socket in a loop
+     * @return Coroutine handle
+     */
+    boost::asio::awaitable<void> start();
+
     /**
      * @brief UDP socket
      */
     std::unique_ptr<boost::asio::ip::udp::socket> m_socket;
 
     /**
-     * @brief Socket writer configuration
+     * @brief Statistics of socket traffic
      */
-    WriterConfig m_writer_config;
+    std::shared_ptr<SocketStats> m_socket_stats;
+
+    /**
+     * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
+     */
+    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+
+    /**
+    * @brief I/O context for socket operations
+    */
+    boost::asio::io_context* m_io_context;    
+
+    /**
+    * @brief Remote endpoint
+    */
+    boost::asio::ip::udp::endpoint m_remote_endpoint;
+
+    /**
+    * @brief Ensures no race on queue
+    */    
+    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;    
   };
 
   // Commands
@@ -207,11 +274,6 @@ private:
    */   
   void run_consume();
 
-  /**
-   * @brief Raw data consume callback function
-   * @param payload Consumed data
-   */  
-  void consume_payload(GenericReceiverConcept::TypeErasedPayload payload);  
 
   /**
    * @brief I/O context for socket operations
@@ -226,7 +288,7 @@ private:
   /**
    * @brief Socket writers
    */
-  std::vector<std::variant<TCPWriter, UDPWriter>> m_writers;
+  std::vector<std::shared_ptr<std::variant<TCPWriter, UDPWriter>>> m_writers;
 
   /**
    * @brief Background thread to keep the I/O context running
@@ -234,41 +296,50 @@ private:
   std::jthread m_io_thread;
 
   /**
-   * @brief Type of socket
-   */
-  SocketType m_socket_type{ SocketType::INVALID };
-
   /**
-   * @brief Socket writer configurations
+   * @brief Socket writer infos
    */
-  std::vector<WriterConfig> m_writer_configs;
-
-  /**
-   * @brief DAQ configuration data
-   */
-  std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
+  std::vector<std::shared_ptr<WriterInfo>> m_writer_infos;
 
   /**
    * @brief Whether callback mode is configured
    */  
   bool m_callback_mode{ false };
 
+  struct RawDataReceiver {
+    /**
+    * @brief UID
+    */      
+    std::string connection_name;
+
+    /**
+    * @brief Source ID
+    */          
+    uint32_t sid;
+
+    /**
+    * @brief Receiver itself
+    */          
+    std::shared_ptr<GenericReceiverConcept> receiver;
+
+    /**
+    * @brief Timeout in milliseconds
+    */          
+    std::chrono::milliseconds timeout_ms;
+  };
+
   // RAW RECEIVER
   /**
-   * @brief Generic raw data receiver
+   * @brief Generic raw data receivers
    */  
-  std::shared_ptr<GenericReceiverConcept> m_raw_data_receiver;
+  std::vector<RawDataReceiver> m_raw_data_receivers;
 
+  using sid_to_writer_map_t = std::map<uint32_t, std::shared_ptr<std::variant<TCPWriter, UDPWriter>>>;
   /**
-   * @brief Raw data receiver timeout
-   */  
-  std::chrono::milliseconds m_raw_receiver_timeout_ms{ raw_receiver_timeout_ms };
-
-  /**
-   * @brief Raw data receiver UID
-   */  
-  std::string m_raw_data_receiver_connection_name;  
-
+   * @brief Source ID to writer map
+   */   
+  sid_to_writer_map_t m_sid_to_writer;
+  
   // CONSUMER
   /**
    * @brief Raw data consume thread
@@ -279,12 +350,6 @@ private:
    * @brief Whether consumer thread should continue
    */    
   std::atomic<bool> m_run_marker { false };
-
-  // Consume callback
-  /**
-   * @brief Raw data consume callback
-   */    
-  std::function<void(GenericReceiverConcept::TypeErasedPayload payload)> m_consume_callback;  
 
   // RUN START T0
   /**

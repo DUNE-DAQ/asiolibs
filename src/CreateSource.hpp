@@ -34,7 +34,7 @@ createSourceModel(const std::string& conn_uid, bool callback_mode)
 {
   auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(conn_uid);
   if (datatypes.size() != 1) {
-    ers::error(dunedaq::datahandlinglibs::GenericConfigurationError(ERS_HERE,
+    ers::error(datahandlinglibs::GenericConfigurationError(ERS_HERE,
       "Multiple output data types specified! Expected only a single type!"));
   }
   std::string raw_dt{ *datatypes.begin() };
