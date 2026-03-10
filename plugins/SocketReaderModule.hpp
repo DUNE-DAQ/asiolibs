@@ -225,7 +225,7 @@ private:
   /**
    * @brief Timestamp used to measure time between opmon reports
    */   
-  std::chrono::time_point<std::chrono::high_resolution_clock> m_t0;    
+  std::chrono::time_point<std::chrono::steady_clock> m_t0;    
 };
 
 } // namespace dunedaq::asiolibs

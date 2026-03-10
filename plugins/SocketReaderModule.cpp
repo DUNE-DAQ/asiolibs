@@ -55,37 +55,18 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 {
   auto* mdal = mcfg->get_dal<appmodel::DataReaderModule>(get_name());
 
-  if (mdal->get_outputs().empty()) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No outputs defined for socket reader in configuration.");
+  if (mdal->get_raw_data_callbacks().empty()) {
+    auto err = datahandlinglibs::InitializationError(ERS_HERE, "No outputs defined for socket reader in configuration.");
     ers::fatal(err);
     throw err;
   }
 
-  for (auto* con : mdal->get_outputs()) {
-    auto* queue = con->cast<confmodel::QueueWithSourceId>();
-    if (queue == nullptr) {
-      auto err = datahandlinglibs::InitializationError(ERS_HERE, "Outputs are not of type QueueWithGeoId.");
-      ers::fatal(err);
-      throw err;
-    }
-
-    auto connection_name = queue->UID();
-
-    // Check for CB prefix indicating Callback use
-    const char delim = '_';
-    const std::string target = connection_name;
-    std::vector<std::string> words;
-    tokenize(target, delim, words);
-
-    bool callback_mode = false;
-    if (words.front() == "cb") {
-      callback_mode = true;
-    }
-
-    auto ptr = m_sources[queue->get_source_id()] = createSourceModel(connection_name, callback_mode);
-    register_node(connection_name, ptr);
-  }   
+  // Loop over output queues, extract source ids and create source model objects
+  for (auto con : mdal->get_raw_data_callbacks()) {
+    // TODO: add nullpointer check against misconfiguration
+    auto ptr = m_sources[con->get_source_id()] = createSourceModel(con);
+    register_node(con->UID(), ptr);
+  }
 
   auto* d2d_conn = mdal->get_connections()[0]; // there's only 1 connection
   auto* socket_d2d_conn = d2d_conn->cast<appmodel::SocketDetectorToDaqConnection>();
@@ -167,7 +148,7 @@ SocketReaderModule::do_start(const CommandData_t&)
     reader_info->socket_stats->stats_packet_count = 0;
   }
 
-  m_t0 = std::chrono::high_resolution_clock::now();
+  m_t0 = std::chrono::steady_clock::now();
 
   // Setup callbacks on all sourcemodels
   for (auto& [_, source] : m_sources) {
@@ -201,7 +182,7 @@ SocketReaderModule::generate_opmon_data()
     stats.set_packets_received(reader_info->socket_stats->packets_received.load());
     stats.set_bytes_received(reader_info->socket_stats->bytes_received.load());
 
-    auto now = std::chrono::high_resolution_clock::now();
+    auto now = std::chrono::steady_clock::now();
     int new_packets = reader_info->socket_stats->stats_packet_count.exchange(0);
     double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
     m_t0 = now;

@@ -41,17 +41,6 @@ SocketWriterModule::SocketWriterModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
-inline void
-tokenize(std::string const& str, const char delim, std::vector<std::string>& out)
-{
-  std::size_t start;
-  std::size_t end = 0;
-  while ((start = str.find_first_not_of(delim, end)) != std::string::npos) {
-    end = str.find(delim, start);
-    out.push_back(str.substr(start, end - start));
-  }
-}
-
 void 
 SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal)
 {
@@ -73,16 +62,7 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
     auto connection_name = queue->UID();
     auto sid = queue->get_source_id();
 
-    // Check for CB prefix indicating Callback use
-    const char delim = '_';
-    const std::string target = connection_name;
-    std::vector<std::string> words;
-    tokenize(target, delim, words);
-
-    if (words.front() == "cb") {
-      TLOG() << "SocketWriterModule does not support callbacks";
-      //m_callback_mode = true;
-    }
+    // SocketWriterModule does not support callbacks
 
     if (!m_callback_mode) {
       auto timeout = con->get_recv_timeout_ms();
@@ -212,7 +192,7 @@ SocketWriterModule::do_start(const CommandData_t&)
     writer_info->socket_stats->stats_packet_count = 0;
   }
 
-  m_t0 = std::chrono::high_resolution_clock::now();
+  m_t0 = std::chrono::steady_clock::now();
 
   if (!m_callback_mode) {
     m_run_marker.store(true);
@@ -249,7 +229,7 @@ SocketWriterModule::generate_opmon_data()
     stats.set_sum_bytes(writer_info->socket_stats->sum_bytes.load());
     stats.set_num_data_input_timeouts(writer_info->socket_stats->rawq_timeout_count.exchange(0));
 
-    auto now = std::chrono::high_resolution_clock::now();
+    auto now = std::chrono::steady_clock::now();
     int new_packets = writer_info->socket_stats->stats_packet_count.exchange(0);
     double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
     m_t0 = now;
