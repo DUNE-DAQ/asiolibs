@@ -301,11 +301,6 @@ private:
    */
   std::vector<std::shared_ptr<WriterInfo>> m_writer_infos;
 
-  /**
-   * @brief Whether callback mode is configured
-   */  
-  bool m_callback_mode{ false };
-
   struct RawDataReceiver {
     /**
     * @brief UID

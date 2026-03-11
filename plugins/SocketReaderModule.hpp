@@ -25,9 +25,9 @@ class SourceConcept;
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
 public:
-  using sender_t = std::pair<std::string, uint32_t>;
-  using sender_stream_pair_t = std::pair<sender_t, uint32_t>;
-  using sender_source_map_t = std::map<sender_stream_pair_t, std::shared_ptr<SourceConcept>>;
+  using remote_t = std::pair<std::string, uint32_t>;
+  using remote_stream_pair_t = std::pair<remote_t, uint32_t>;
+  using remote_source_map_t = std::map<remote_stream_pair_t, std::shared_ptr<SourceConcept>>;
 
   /**
    * @brief SocketReaderModule constructor
@@ -107,7 +107,7 @@ private:
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sender_source_map_t& sender_to_source);
+    boost::asio::awaitable<void> start(const remote_source_map_t& remote_to_source);
 
     /**
      * @brief Closes the socket
@@ -123,7 +123,7 @@ private:
     /**
      * @brief Connected remote
      */    
-    sender_t m_remote;
+    remote_t m_remote;
 
     /**
      * @brief Statistics of socket traffic
@@ -146,7 +146,7 @@ private:
      * @param sources Data sources
      * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(const sender_source_map_t& sender_to_source);
+    boost::asio::awaitable<void> start(const remote_source_map_t& remote_to_source);
 
     /**
      * @brief Closes the socket
@@ -217,9 +217,9 @@ private:
   sid_to_source_map_t m_sources;
 
   /**
-   * @brief Map between a pair of {sender, stream} and the corresponding source
+   * @brief Map between a pair of {remote, stream} and the corresponding source
    */    
-  sender_source_map_t m_sender_to_source;  
+  remote_source_map_t m_remote_to_source;  
 
   // RUN START T0
   /**

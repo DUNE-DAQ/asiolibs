@@ -112,8 +112,8 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
         continue;
       }
 
-      sender_stream_pair_t sender_stream_pair = { { remote_ip, remote_port}, det_stream->get_geo_id()->get_stream_id() };
-      m_sender_to_source[sender_stream_pair] = m_sources[det_stream->get_source_id()];
+      remote_stream_pair_t sender_stream_pair = { { remote_ip, remote_port}, det_stream->get_geo_id()->get_stream_id() };
+      m_remote_to_source[sender_stream_pair] = m_sources[det_stream->get_source_id()];
     }        
   }
 }
@@ -159,7 +159,7 @@ SocketReaderModule::do_start(const CommandData_t&)
 
   for (auto& reader : m_readers) {
     boost::asio::co_spawn(m_io_context,
-                          std::visit([this](auto& reader) { return reader.start(m_sender_to_source); }, *reader),
+                          std::visit([this](auto& reader) { return reader.start(m_remote_to_source); }, *reader),
                           boost::asio::detached);
   }
 }
@@ -224,9 +224,9 @@ SocketReaderModule::TCPReader::configure(boost::asio::io_context& io_context, st
 }
 
 boost::asio::awaitable<void>
-SocketReaderModule::TCPReader::start(const sender_source_map_t& sender_to_source)
+SocketReaderModule::TCPReader::start(const remote_source_map_t& remote_to_source)
 {
-  const auto buffer_size = sender_to_source.begin()->second->get_target_payload_size();
+  const auto buffer_size = remote_to_source.begin()->second->get_target_payload_size();
   std::vector<char> buffer(buffer_size);
 
   while (m_socket->is_open()) {
@@ -238,10 +238,10 @@ SocketReaderModule::TCPReader::start(const sender_source_map_t& sender_to_source
     const auto* daq_header = reinterpret_cast<const dunedaq::detdataformats::DAQEthHeader*>(buffer.data());
     
     auto stream_id = (unsigned)daq_header->stream_id;
-    sender_stream_pair_t sender_stream_pair = { m_remote, stream_id };
+    remote_stream_pair_t sender_stream_pair = { m_remote, stream_id };
     
-    auto src_it = sender_to_source.find(sender_stream_pair);    
-    if (src_it == sender_to_source.end()) {
+    auto src_it = remote_to_source.find(sender_stream_pair);    
+    if (src_it == remote_to_source.end()) {
       TLOG() << "Unexpected sender-stream combination! (" << m_remote.first << ":" << m_remote.second << ", " << stream_id << ")";
       continue;
     }
@@ -285,9 +285,9 @@ SocketReaderModule::UDPReader::configure(boost::asio::io_context& io_context, st
 }
 
 boost::asio::awaitable<void>
-SocketReaderModule::UDPReader::start(const sender_source_map_t& sender_to_source)
+SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source)
 {
-  const auto buffer_size = sender_to_source.begin()->second->get_target_payload_size();
+  const auto buffer_size = remote_to_source.begin()->second->get_target_payload_size();
   std::vector<char> buffer(buffer_size);
   boost::asio::ip::udp::endpoint sender_endpoint;
 
@@ -299,12 +299,12 @@ SocketReaderModule::UDPReader::start(const sender_source_map_t& sender_to_source
 
     auto stream_id = (unsigned)daq_header->stream_id;
 
-    sender_t remote = { sender_endpoint.address().to_string(), sender_endpoint.port() } ;
-    sender_stream_pair_t sender_stream_pair = { remote, stream_id };
+    remote_t remote = { sender_endpoint.address().to_string(), sender_endpoint.port() } ;
+    remote_stream_pair_t sender_stream_pair = { remote, stream_id };
     
-    auto src_it = sender_to_source.find(sender_stream_pair);
+    auto src_it = remote_to_source.find(sender_stream_pair);
     
-    if (src_it == sender_to_source.end()) {
+    if (src_it == remote_to_source.end()) {
       TLOG() << "Unexpected sender-stream combination! (" << remote.first << ":" << remote.second << ", " << stream_id << ")";
       continue;
     }

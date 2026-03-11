@@ -19,7 +19,6 @@
 #include "confmodel/NetworkInterface.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
-//#include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
 
 #include "asiolibs/opmon/SocketWriterModule.pb.h"
 
@@ -59,24 +58,22 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
       throw err;
     }
 
-    auto connection_name = queue->UID();
     auto sid = queue->get_source_id();
 
     // SocketWriterModule does not support callbacks
+    auto connection_name = queue->UID();
 
-    if (!m_callback_mode) {
-      auto timeout = con->get_recv_timeout_ms();
-      if (timeout == 0) {
-        ers::warning(InvalidRawReceiverTimeout(ERS_HERE, default_raw_receiver_timeout_ms));
-        timeout = default_raw_receiver_timeout_ms;
-      }
-      auto receiver = createGenericReceiver(connection_name);
-      // Raw input connection sensibility check
-      if (receiver == nullptr) {
-        //ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!")); FIXME (DTE)
-      }
-      m_raw_data_receivers.push_back({ connection_name, sid, receiver, std::chrono::milliseconds(timeout) });
+    auto timeout = con->get_recv_timeout_ms();
+    if (timeout == 0) {
+      ers::warning(InvalidRawReceiverTimeout(ERS_HERE, default_raw_receiver_timeout_ms));
+      timeout = default_raw_receiver_timeout_ms;
     }
+    auto receiver = createGenericReceiver(connection_name);
+    // Raw input connection sensibility check
+    if (receiver == nullptr) {
+      //ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!")); FIXME (DTE)
+    }
+    m_raw_data_receivers.push_back({ connection_name, sid, receiver, std::chrono::milliseconds(timeout) });
   }
 }
 
@@ -153,9 +150,9 @@ SocketWriterModule::run_consume()
 
   while (m_run_marker.load()) {
     // Try to acquire data
-    for (const auto& [connection_name, sid, recv, timeout] : m_raw_data_receivers) {
+    for (const auto& [connection_name, sid, receiver, timeout] : m_raw_data_receivers) {
       auto writer = m_sid_to_writer[sid];
-      if (auto opt_payload = recv->try_receive(timeout)) {
+      if (auto opt_payload = receiver->try_receive(timeout)) {
         std::visit([&](auto& w) { w.enqueue(std::move(*opt_payload)); }, *writer);
       } else {
         std::visit([&](auto& w) { ++w.get_socket_stats()->rawq_timeout_count; }, *writer);
@@ -171,8 +168,6 @@ SocketWriterModule::do_configure(const CommandData_t&)
 {
   TLOG() << "Entering do_conf() method";
   
-  // Register callbacks if operating in that mode. Currently not supported.
-
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
     auto writer_info = m_writer_infos[i];
     std::visit([this, writer_info](auto& writer) { writer.configure(m_io_context, writer_info); }, *m_writers[i]);    
@@ -194,10 +189,8 @@ SocketWriterModule::do_start(const CommandData_t&)
 
   m_t0 = std::chrono::steady_clock::now();
 
-  if (!m_callback_mode) {
-    m_run_marker.store(true);
-    m_consumer_thread.set_work(&SocketWriterModule::run_consume, this);
-  }
+  m_run_marker.store(true);
+  m_consumer_thread.set_work(&SocketWriterModule::run_consume, this);
 
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 }
@@ -205,11 +198,9 @@ SocketWriterModule::do_start(const CommandData_t&)
 void
 SocketWriterModule::do_stop(const CommandData_t&)
 {
-  if (!m_callback_mode) {
-    m_run_marker.store(false);
-    while (!m_consumer_thread.get_readiness()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+  m_run_marker.store(false);
+  while (!m_consumer_thread.get_readiness()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
   for (auto& writer : m_writers) {
