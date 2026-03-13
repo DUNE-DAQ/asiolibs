@@ -73,12 +73,7 @@ private:
     /**
      * @brief Total number of received bytes 
      */
-    std::atomic<uint64_t> sum_bytes{ 0 };
-
-    /**
-     * @brief Timeout on data inputs 
-     */
-    std::atomic<uint64_t> rawq_timeout_count{ 0 };    
+    std::atomic<uint64_t> sum_bytes{ 0 };  
 
     /**
      * @brief Rate of consumed packets 
