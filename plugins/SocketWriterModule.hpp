@@ -8,12 +8,13 @@
 #ifndef ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
 #define ASIOLIBS_PLUGINS_SOCKETWRITERMODULE_HPP_
 
-#include "GenericReceiverConcept.hpp"
+#include "GenericCallbackConcept.hpp"
 
 #include "appfwk/DAQModule.hpp"
 #include "utilities/ReusableThread.hpp"
 
 #include "appmodel/SocketDataWriterModule.hpp"
+#include "appmodel/DataMoveCallbackConf.hpp"
 
 #include <boost/asio.hpp>
 
@@ -138,7 +139,7 @@ private:
      * @brief Enqueues payload
      * @param payload Payload to send
      */
-    void enqueue(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericCallbackConcept::TypeErasedPayload&& payload);
 
     /**
      * @brief Closes the socket
@@ -171,7 +172,7 @@ private:
     /**
      * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
      */
-    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+    std::queue<GenericCallbackConcept::TypeErasedPayload> m_payloads;
 
     /**
     * @brief I/O context for socket operations
@@ -198,7 +199,7 @@ private:
      * @brief Enqueues payload
      * @param payload Payload to send
      */
-    void enqueue(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericCallbackConcept::TypeErasedPayload&& payload);
 
     /**
      * @brief Closes the socket
@@ -231,7 +232,7 @@ private:
     /**
      * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
      */
-    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+    std::queue<GenericCallbackConcept::TypeErasedPayload> m_payloads;
 
     /**
     * @brief I/O context for socket operations
@@ -264,18 +265,6 @@ private:
   SocketType string_to_socket_type(const std::string& socket_type) const;
 
   /**
-   * @brief Gets dal inputs
-   * @param mdal SocketDataWriterModule dal
-   */   
-  void get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal);
-
-  /**
-   * @brief Raw data consume thread function
-   */   
-  void run_consume();
-
-
-  /**
    * @brief I/O context for socket operations
    */
   boost::asio::io_context m_io_context;
@@ -301,33 +290,15 @@ private:
    */
   std::vector<std::shared_ptr<WriterInfo>> m_writer_infos;
 
-  struct RawDataReceiver {
-    /**
-    * @brief UID
-    */      
-    std::string connection_name;
-
-    /**
-    * @brief Source ID
-    */          
-    uint32_t sid;
-
-    /**
-    * @brief Receiver itself
-    */          
-    std::shared_ptr<GenericReceiverConcept> receiver;
-
-    /**
-    * @brief Timeout in milliseconds
-    */          
-    std::chrono::milliseconds timeout_ms;
-  };
-
-  // RAW RECEIVER
   /**
-   * @brief Generic raw data receivers
+   * @brief Raw data callback confs
    */  
-  std::vector<RawDataReceiver> m_raw_data_receivers;
+  std::vector<const appmodel::DataMoveCallbackConf*> m_raw_data_callback_confs;
+
+  /**
+   * @brief Generic raw data callbacks
+   */    
+  std::vector<std::shared_ptr<GenericCallbackConcept>> m_raw_data_callbacks;
 
   using sid_to_writer_map_t = std::map<uint32_t, std::shared_ptr<std::variant<TCPWriter, UDPWriter>>>;
   /**
@@ -335,17 +306,6 @@ private:
    */   
   sid_to_writer_map_t m_sid_to_writer;
   
-  // CONSUMER
-  /**
-   * @brief Raw data consume thread
-   */     
-  utilities::ReusableThread m_consumer_thread;
-
-  /**
-   * @brief Whether consumer thread should continue
-   */    
-  std::atomic<bool> m_run_marker { false };
-
   // RUN START T0
   /**
    * @brief Timestamp used to measure time between opmon reports

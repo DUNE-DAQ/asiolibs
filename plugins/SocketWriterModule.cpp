@@ -8,7 +8,7 @@
 
 #include "SocketWriterModule.hpp"
 
-#include "CreateGenericReceiver.hpp"
+#include "CreateGenericCallback.hpp"
 
 #include "appfwk/ConfigurationManager.hpp"
 #include "appmodel/SocketDataSender.hpp"
@@ -40,50 +40,21 @@ SocketWriterModule::SocketWriterModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
-void 
-SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal)
-{
-  if (mdal->get_inputs().empty()) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE,
-                                                              "No inputs defined for socket writer in configuration.");
-    ers::fatal(err);
-    throw err;
-  }
-
-  for (auto* con : mdal->get_inputs()) {
-    auto* queue = con->cast<confmodel::QueueWithSourceId>();
-    if (queue == nullptr) {
-      auto err = datahandlinglibs::InitializationError(ERS_HERE, "Input is not of type QueueWithGeoId.");
-      ers::fatal(err);
-      throw err;
-    }
-
-    auto sid = queue->get_source_id();
-
-    // SocketWriterModule does not support callbacks
-    auto connection_name = queue->UID();
-
-    auto timeout = con->get_recv_timeout_ms();
-    if (timeout == 0) {
-      ers::warning(InvalidRawReceiverTimeout(ERS_HERE, default_raw_receiver_timeout_ms));
-      timeout = default_raw_receiver_timeout_ms;
-    }
-    auto receiver = createGenericReceiver(connection_name);
-    // Raw input connection sensibility check
-    if (receiver == nullptr) {
-      //ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!")); FIXME (DTE)
-    }
-    m_raw_data_receivers.push_back({ connection_name, sid, receiver, std::chrono::milliseconds(timeout) });
-  }
-}
-
 void
 SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
   auto* mdal = mcfg->get_dal<appmodel::SocketDataWriterModule>(get_name());
 
-  get_dal_inputs(mdal);
-  
+  if (mdal->get_raw_data_callbacks().empty()) {
+    auto err = datahandlinglibs::InitializationError(ERS_HERE, "No inputs defined for socket writer in configuration.");
+    ers::fatal(err);
+    throw err;
+  }
+
+  for (auto con : mdal->get_raw_data_callbacks()) {
+    m_raw_data_callback_confs.push_back(con);
+  }  
+
   auto* d2d_conn = mdal->get_connections()[0]; // there's only 1 connection
   auto* socket_d2d_conn = d2d_conn->cast<appmodel::SocketDetectorToDaqConnection>();
   if (socket_d2d_conn == nullptr) {
@@ -143,36 +114,29 @@ SocketWriterModule::string_to_socket_type(const std::string& socket_type) const
   return SocketWriterModule::SocketType::INVALID;
 }
 
-void 
-SocketWriterModule::run_consume()
-{
-  TLOG() << "Consumer thread started..."; // TODO (DTE): Make debug logs
-
-  while (m_run_marker.load()) {
-    // Try to acquire data
-    for (const auto& [connection_name, sid, receiver, timeout] : m_raw_data_receivers) {
-      auto writer = m_sid_to_writer[sid];
-      if (auto opt_payload = receiver->try_receive(timeout)) {
-        std::visit([&](auto& w) { w.enqueue(std::move(*opt_payload)); }, *writer);
-      } else {
-        std::visit([&](auto& w) { ++w.get_socket_stats()->rawq_timeout_count; }, *writer);
-      }
-    }
-  }
-
-  TLOG() << "Consumer thread joins... ";
-}
-
 void
 SocketWriterModule::do_configure(const CommandData_t&)
 {
-  TLOG() << "Entering do_conf() method";
-  
+  for (auto conf : m_raw_data_callback_confs) {
+    auto sid = conf->get_source_id();
+
+    auto cb = createGenericCallback(conf, 
+      [this, sid](GenericCallbackConcept::TypeErasedPayload&& payload) {
+        auto it = m_sid_to_writer.find(sid);
+        if (it != m_sid_to_writer.end()) {
+            std::visit([&](auto& writer) { writer.enqueue(std::move(payload)); }, *it->second);
+        } else {
+            TLOG() << "No socket writer found for source_id " << sid;
+        }
+      });
+
+    m_raw_data_callbacks.push_back(std::move(cb));
+  }
+
   for (std::size_t i = 0; i < m_writers.size(); ++i) {
     auto writer_info = m_writer_infos[i];
     std::visit([this, writer_info](auto& writer) { writer.configure(m_io_context, writer_info); }, *m_writers[i]);    
   }
-  TLOG() << "Exiting do_conf() method";
 }
 
 void
@@ -189,20 +153,12 @@ SocketWriterModule::do_start(const CommandData_t&)
 
   m_t0 = std::chrono::steady_clock::now();
 
-  m_run_marker.store(true);
-  m_consumer_thread.set_work(&SocketWriterModule::run_consume, this);
-
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 }
 
 void
 SocketWriterModule::do_stop(const CommandData_t&)
 {
-  m_run_marker.store(false);
-  while (!m_consumer_thread.get_readiness()) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-
   for (auto& writer : m_writers) {
     std::visit([](auto& writer) { writer.stop(); }, *writer);
   }
@@ -273,7 +229,7 @@ SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, st
 }
 
 void
-SocketWriterModule::TCPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload payload)
+SocketWriterModule::TCPWriter::enqueue(GenericCallbackConcept::TypeErasedPayload&& payload)
 {
   boost::asio::post(*m_strand, [this, payload = std::move(payload)]() mutable {
     m_payloads.push(std::move(payload));
@@ -344,7 +300,7 @@ SocketWriterModule::UDPWriter::configure(boost::asio::io_context& io_context, st
 }
 
 void
-SocketWriterModule::UDPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload payload)
+SocketWriterModule::UDPWriter::enqueue(GenericCallbackConcept::TypeErasedPayload&& payload)
 {
   boost::asio::post(*m_strand, [this, payload = std::move(payload)]() mutable {
     m_payloads.push(std::move(payload));

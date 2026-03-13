@@ -226,7 +226,7 @@ SocketReaderModule::TCPReader::configure(boost::asio::io_context& io_context, st
 boost::asio::awaitable<void>
 SocketReaderModule::TCPReader::start(const remote_source_map_t& remote_to_source)
 {
-  const auto buffer_size = remote_to_source.begin()->second->get_target_payload_size();
+  const auto buffer_size = remote_to_source.begin()->second->get_expected_frame_size();
   std::vector<char> buffer(buffer_size);
 
   while (m_socket->is_open()) {
@@ -246,7 +246,7 @@ SocketReaderModule::TCPReader::start(const remote_source_map_t& remote_to_source
       continue;
     }
     
-    src_it->second->handle_payload(buffer.data(), bytes_received);
+    src_it->second->handle_daq_frame(buffer.data());
 
     ++m_socket_stats->packets_received;
     m_socket_stats->bytes_received.fetch_add(bytes_received);
@@ -287,7 +287,7 @@ SocketReaderModule::UDPReader::configure(boost::asio::io_context& io_context, st
 boost::asio::awaitable<void>
 SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source)
 {
-  const auto buffer_size = remote_to_source.begin()->second->get_target_payload_size();
+  const auto buffer_size = remote_to_source.begin()->second->get_expected_frame_size();
   std::vector<char> buffer(buffer_size);
   boost::asio::ip::udp::endpoint sender_endpoint;
 
@@ -310,7 +310,7 @@ SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source
     }
     
     if (bytes_received == buffer_size) [[likely]] {
-      src_it->second->handle_payload(buffer.data(), bytes_received);
+      src_it->second->handle_daq_frame(buffer.data());
     } else {
       TLOG() << "Payload is smaller than " << buffer_size << " (" << bytes_received << ")";
     }

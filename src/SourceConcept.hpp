@@ -44,14 +44,16 @@ namespace dunedaq {
       //  virtual void start(const nlohmann::json& args) = 0;
       //  virtual void stop(const nlohmann::json& args) = 0;
 
-      virtual bool handle_payload(char* message, std::size_t size) = 0;
-      virtual std::size_t get_target_payload_size() const = 0;
+      // Meant to process an incoming raw byte buffer and extract complete frames of arbitrary types in specialized models.
+      virtual void handle_daq_frame(char* buffer) = 0;
+      virtual std::size_t get_expected_frame_size() const = 0;
 
       void set_sink_config(const appmodel::DataMoveCallbackConf* sink_conf) 
       { 
-	m_sink_conf = sink_conf; 
+        m_sink_conf = sink_conf; 
       }
 
+      // Sink or destination related
       const appmodel::DataMoveCallbackConf* m_sink_conf;
     };
 
