@@ -160,11 +160,6 @@ private:
     std::unique_ptr<boost::asio::ip::udp::socket> m_socket;
 
     /**
-     * @brief Detector stream source ID
-     */
-    uint32_t m_source_id;
-
-    /**
      * @brief Statistics of socket traffic
      */
     std::shared_ptr<SocketStats> m_socket_stats;

@@ -31,11 +31,6 @@ class SocketWriterModule : public dunedaq::appfwk::DAQModule
 {
 public:
   /**
-   * @brief Default raw data receiver timeout in ms
-   */
-  static constexpr auto default_raw_receiver_timeout_ms = 10;
-
-  /**
    * @brief SocketWriterModule constructor
    * @param name DAQ module instance name
    */

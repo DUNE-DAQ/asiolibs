@@ -147,7 +147,6 @@ SocketWriterModule::do_start(const CommandData_t&)
     writer_info->socket_stats->sum_payloads = 0;
     writer_info->socket_stats->num_payloads = 0;
     writer_info->socket_stats->sum_bytes = 0;
-    writer_info->socket_stats->rawq_timeout_count = 0;
     writer_info->socket_stats->stats_packet_count = 0;
   }
 
@@ -174,7 +173,6 @@ SocketWriterModule::generate_opmon_data()
     stats.set_sum_payloads(writer_info->socket_stats->sum_payloads.load());
     stats.set_num_payloads(writer_info->socket_stats->num_payloads.exchange(0));
     stats.set_sum_bytes(writer_info->socket_stats->sum_bytes.load());
-    stats.set_num_data_input_timeouts(writer_info->socket_stats->rawq_timeout_count.exchange(0));
 
     auto now = std::chrono::steady_clock::now();
     int new_packets = writer_info->socket_stats->stats_packet_count.exchange(0);
