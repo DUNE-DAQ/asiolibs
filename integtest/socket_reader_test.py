@@ -124,6 +124,42 @@ onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
         replacement_object_id="crt-grenoble-raw-input"
     )
 )
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="DetectorStream",
+        obj_id="stream_1007",
+        rel_name="geo_id",
+        replacement_object_class="GeoId",
+        replacement_object_id="g_13_1_1_0"
+    )
+)
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="DetectorStream",
+        obj_id="stream_1008",
+        rel_name="geo_id",
+        replacement_object_class="GeoId",
+        replacement_object_id="g_13_1_1_1"
+    )
+)
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="DetectorStream",
+        obj_id="stream_1009",
+        rel_name="geo_id",
+        replacement_object_class="GeoId",
+        replacement_object_id="g_13_2_1_0"
+    )
+)
+onebyone_local_emu_crt_grenoble_conf.config_substitutions.append(
+    data_classes.relationship_substitution(
+        obj_class="DetectorStream",
+        obj_id="stream_1010",
+        rel_name="geo_id",
+        replacement_object_class="GeoId",
+        replacement_object_id="g_13_2_1_1"
+    )
+)
 
 confgen_arguments = {
     "Local Emu CRT Bern 1x1 Conf": onebyone_local_emu_crt_bern_conf,
