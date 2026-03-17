@@ -11,13 +11,13 @@
 #include "GenericCallbackConcept.hpp"
 #include "GenericCallbackModel.hpp"
 
-#include "fddetdataformats/CRTBernFrame.hpp"
-#include "fddetdataformats/CRTGrenobleFrame.hpp"
+#include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
+#include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
 
 #include <memory>
 
-DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTBernFrame, "CRTBernFrame")
-DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTGrenobleFrame, "CRTGrenobleFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
 
 namespace dunedaq::asiolibs {
  
@@ -29,9 +29,9 @@ createGenericCallback(const appmodel::DataMoveCallbackConf* conf, GenericCallbac
          << " [uid:" << conf->UID() << " , data_type:" << datatype << ']';
 
   if (datatype.find("CRTBernFrame") != std::string::npos) {
-    return std::make_shared<GenericCallbackModel<fddetdataformats::CRTBernFrame>>(conf, std::move(cb));
+    return std::make_shared<GenericCallbackModel<fdreadoutlibs::types::CRTBernTypeAdapter>>(conf, std::move(cb));
   } else if (datatype.find("CRTGrenobleFrame") != std::string::npos) {
-    return std::make_shared<GenericCallbackModel<fddetdataformats::CRTGrenobleFrame>>(conf, std::move(cb));
+    return std::make_shared<GenericCallbackModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>(conf, std::move(cb));
   }
 
   return nullptr;
