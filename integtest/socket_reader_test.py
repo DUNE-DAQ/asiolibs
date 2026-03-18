@@ -34,6 +34,15 @@ grenoble_crt_frag_params = {
     "min_size_bytes": 1752,
     "max_size_bytes": 3992,
 }
+hsi_frag_params = {
+    "fragment_type_description": "HSI",
+    "fragment_type": "Hardware_Signal",
+    "expected_fragment_count": 1,
+    "min_size_bytes": 72,
+    "max_size_bytes": 100,
+    "frag_sizes_by_TC_type": {"kTiming": {"min_size_bytes": 100, "max_size_bytes": 100},
+                              "default": {"min_size_bytes":  72, "max_size_bytes": 100} }
+}
 
 ignored_logfile_problems = {
     "local-connection-server": [
@@ -53,6 +62,20 @@ common_config_obj.op_env = "test"
 # in a local copy of the daqsystemtest repo before this code will see those changes.
 common_config_obj.config_db = (
     os.environ.get("DAQSYSTEMTEST_SHARE") + "/config/daqsystemtest/example-configs.data.xml"
+)
+common_config_obj.config_substitutions.append(
+    data_classes.attribute_substitution(
+        obj_id="random-tc-generator",
+        obj_class="RandomTCMakerConf",
+        updates={"candidate_window_before_ts": 8000, "candidate_window_after_ts": 10},
+    )
+)
+common_config_obj.config_substitutions.append(
+    data_classes.attribute_substitution(
+        obj_id="def-hsi-tc-map",
+        obj_class="TCReadoutMap",
+        updates={"time_before": 8000, "time_after": 10},
+    )
 )
 
 onebyone_local_emu_crt_bern_conf = copy.deepcopy(common_config_obj)
@@ -76,6 +99,7 @@ onebyone_local_emu_crt_bern_conf.config_substitutions.append(
         updates={"local_port": new_local_port, "remote_port": new_remote_port},
     )
 )
+
 onebyone_local_emu_crt_grenoble_conf = copy.deepcopy(common_config_obj)
 onebyone_local_emu_crt_grenoble_conf.session = "local-socket-1x1-config"
 
@@ -174,7 +198,7 @@ nanorc_command_list += (
 )
 nanorc_command_list += "scrap terminate".split()
 
-def test_nanorc_success(run_nanorc):
+def test_nanorc_success(run_dunerc):
     # print the name of the current test
     current_test = os.environ.get("PYTEST_CURRENT_TEST")
     match_obj = re.search(r".*\[(.+)-run_.*rc.*\d].*", current_test)
@@ -186,33 +210,37 @@ def test_nanorc_success(run_nanorc):
     print(banner_line)    
 
     # Check that nanorc completed correctly
-    assert run_nanorc.completed_process.returncode == 0 
+    assert run_dunerc.completed_process.returncode == 0
 
-def test_log_files(run_nanorc):
+def test_log_files(run_dunerc):
     if check_for_logfile_errors:
         # Check that there are no warnings or errors in the log files
         assert log_file_checks.logs_are_error_free(
-            run_nanorc.log_files, True, True, ignored_logfile_problems
+            run_dunerc.log_files, True, True, ignored_logfile_problems
         )
 
-def test_data_files(run_nanorc):
+def test_data_files(run_dunerc):
+    expected_event_count = round(4.2 * run_duration)
+    expected_event_count_tolerance = round(expected_event_count * 0.06)
     fragment_check_list = []
     current_test = os.environ.get("PYTEST_CURRENT_TEST")
     if "Bern" in current_test:
         fragment_check_list.append(bern_crt_frag_params)
     elif "Grenoble" in current_test:
         fragment_check_list.append(grenoble_crt_frag_params)
+    fragment_check_list.append(hsi_frag_params)
     # Run some tests on the output data file
     all_ok = True
-    all_ok &= len(run_nanorc.data_files) == expected_number_of_data_files
+    all_ok &= len(run_dunerc.data_files) == expected_number_of_data_files
     print("") # Clear potential dot from pytest
     if all_ok:
         print(f"\N{WHITE HEAVY CHECK MARK} The correct number of raw data files was found ({expected_number_of_data_files})")
     else:
-        print(f"\N{POLICE CARS REVOLVING LIGHT} An incorrect number of raw data files was found, expected {expected_number_of_data_files}, found {len(run_nanorc.data_files)} \N{POLICE CARS REVOLVING LIGHT}")
+        print(f"\N{POLICE CARS REVOLVING LIGHT} An incorrect number of raw data files was found, expected {expected_number_of_data_files}, found {len(run_dunerc.data_files)} \N{POLICE CARS REVOLVING LIGHT}")
 
-    for idx in range(len(run_nanorc.data_files)):
-        data_file = data_file_checks.DataFile(run_nanorc.data_files[idx])
+    for idx in range(len(run_dunerc.data_files)):
+        data_file = data_file_checks.DataFile(run_dunerc.data_files[idx])
+        all_ok &= data_file_checks.check_event_count(data_file, expected_event_count, expected_event_count_tolerance)
         for jdx in range(len(fragment_check_list)):
             all_ok &= data_file_checks.check_fragment_count(
                 data_file, fragment_check_list[jdx]
