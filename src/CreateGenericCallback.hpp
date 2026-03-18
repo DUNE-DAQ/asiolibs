@@ -15,6 +15,8 @@
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
 
 #include <memory>
+#include <string>
+#include <utility>
 
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")

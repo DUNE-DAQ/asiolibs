@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace dunedaq::asiolibs {
 
@@ -25,8 +26,8 @@ class SourceConcept;
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
 public:
-  using remote_t = std::pair<std::string, uint32_t>;
-  using remote_stream_pair_t = std::pair<remote_t, uint32_t>;
+  using remote_t = std::pair<std::string, uint32_t>; // NOLINT(build/unsigned)
+  using remote_stream_pair_t = std::pair<remote_t, uint32_t>; // NOLINT(build/unsigned)
   using remote_source_map_t = std::map<remote_stream_pair_t, std::shared_ptr<SourceConcept>>;
 
   /**
@@ -60,12 +61,12 @@ private:
     /**
      * @brief Received packets
      */
-    std::atomic<uint64_t> packets_received{ 0 };
+    std::atomic<uint64_t> packets_received{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Received bytes
      */
-    std::atomic<uint64_t> bytes_received{ 0 };
+    std::atomic<uint64_t> bytes_received{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Counts packets since last opmon data generation
@@ -83,7 +84,7 @@ private:
     /**
      * @brief Source port number
      */
-    uint32_t local_port;
+    uint32_t local_port; // NOLINT(build/unsigned)
 
     /**
      * @brief Statistics of socket traffic
@@ -205,7 +206,7 @@ private:
   std::vector<std::shared_ptr<ReaderInfo>> m_reader_infos;
 
   // Sinks (SourceConcepts)
-  using sid_to_source_map_t = std::map<uint32_t, std::shared_ptr<SourceConcept>>;
+  using sid_to_source_map_t = std::map<uint32_t, std::shared_ptr<SourceConcept>>; // NOLINT(build/unsigned)
   /**
    * @brief Data sources
    */
@@ -216,11 +217,6 @@ private:
    */    
   remote_source_map_t m_remote_to_source;  
 
-  // RUN START T0
-  /**
-   * @brief Timestamp used to measure time between opmon reports
-   */   
-  std::chrono::time_point<std::chrono::steady_clock> m_t0;    
 };
 
 } // namespace dunedaq::asiolibs

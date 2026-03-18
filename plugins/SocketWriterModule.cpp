@@ -14,6 +14,7 @@
 #include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataReceiver.hpp"
 #include "appmodel/SocketDetectorToDaqConnection.hpp"
+#include "appmodel/SocketDataWriterModule.hpp"
 #include "confmodel/DetectorStream.hpp"
 #include "confmodel/QueueWithSourceId.hpp"
 #include "confmodel/NetworkInterface.hpp"

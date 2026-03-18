@@ -39,17 +39,6 @@ SocketReaderModule::SocketReaderModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketReaderModule::do_stop);
 }
 
-inline void
-tokenize(std::string const& str, const char delim, std::vector<std::string>& out)
-{
-  std::size_t start;
-  std::size_t end = 0;
-  while ((start = str.find_first_not_of(delim, end)) != std::string::npos) {
-    end = str.find(delim, start);
-    out.push_back(str.substr(start, end - start));
-  }
-}
-
 void
 SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
@@ -148,8 +137,6 @@ SocketReaderModule::do_start(const CommandData_t&)
     reader_info->socket_stats->stats_packet_count = 0;
   }
 
-  m_t0 = std::chrono::steady_clock::now();
-
   // Setup callbacks on all sourcemodels
   for (auto& [_, source] : m_sources) {
     source->acquire_callback();
@@ -181,12 +168,6 @@ SocketReaderModule::generate_opmon_data()
     opmon::SocketReaderStats stats;
     stats.set_packets_received(reader_info->socket_stats->packets_received.load());
     stats.set_bytes_received(reader_info->socket_stats->bytes_received.load());
-
-    auto now = std::chrono::steady_clock::now();
-    int new_packets = reader_info->socket_stats->stats_packet_count.exchange(0);
-    double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
-    m_t0 = now;
-
     publish(std::move(stats), { { "socket-reader", reader_info->local_ip + ":" + std::to_string(reader_info->local_port) } });
   }
 }
@@ -237,7 +218,7 @@ SocketReaderModule::TCPReader::start(const remote_source_map_t& remote_to_source
 
     const auto* daq_header = reinterpret_cast<const dunedaq::detdataformats::DAQEthHeader*>(buffer.data());
     
-    auto stream_id = (unsigned)daq_header->stream_id;
+    auto stream_id = static_cast<unsigned>(daq_header->stream_id);
     remote_stream_pair_t sender_stream_pair = { m_remote, stream_id };
     
     auto src_it = remote_to_source.find(sender_stream_pair);    
@@ -297,7 +278,7 @@ SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source
 
     const auto* daq_header = reinterpret_cast<const dunedaq::detdataformats::DAQEthHeader*>(buffer.data());
 
-    auto stream_id = (unsigned)daq_header->stream_id;
+    auto stream_id = static_cast<unsigned>(daq_header->stream_id);
 
     remote_t remote = { sender_endpoint.address().to_string(), sender_endpoint.port() } ;
     remote_stream_pair_t sender_stream_pair = { remote, stream_id };

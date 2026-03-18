@@ -28,7 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
-
+#include <utility>
 
 namespace dunedaq::asiolibs {
 
@@ -62,7 +62,7 @@ public:
   }
 
   // Process an incoming raw byte buffer and extract complete frames of type TargetPayloadType.
-  void handle_daq_frame(char* buffer)
+  void handle_daq_frame(char* buffer) override
   {
     // Materialize a real TargetPayloadType object by copying bytes from the buffer.
     // This is defined behavior, alignment-safe, and fast, without pointer vodoo
@@ -97,7 +97,7 @@ private:
   sink_cb_t m_sink_callback;
 
   // Stats  
-  std::atomic<uint64_t> m_leftover_bytes_encountered{0};
+  std::atomic<uint64_t> m_leftover_bytes_encountered{0}; // NOLINT(build/unsigned)
 
 };
 

@@ -5,11 +5,14 @@
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
-#ifndef ASIOLIBS_SRC_GENERICCALLBACKCONCEPT_HPP_
-#define ASIOLIBS_SRC_GENERICCALLBACKCONCEPT_HPP_
+#ifndef ASIOLIBS_SRC_GENERICCALLBACKMODEL_HPP_
+#define ASIOLIBS_SRC_GENERICCALLBACKMODEL_HPP_
 
 #include "GenericCallbackConcept.hpp"
 #include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
+
+#include <utility>
+#include <memory>
 
 namespace dunedaq::asiolibs {
 
@@ -41,4 +44,4 @@ public:
 
 } // namespace dunedaq::asiolibs
 
-#endif // ASIOLIBS_SRC_GENERICCALLBACKCONCEPT_HPP_
+#endif // ASIOLIBS_SRC_GENERICCALLBACKMODEL_HPP_

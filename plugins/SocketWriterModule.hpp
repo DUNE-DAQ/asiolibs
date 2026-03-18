@@ -13,7 +13,6 @@
 #include "appfwk/DAQModule.hpp"
 #include "utilities/ReusableThread.hpp"
 
-#include "appmodel/SocketDataWriterModule.hpp"
 #include "appmodel/DataMoveCallbackConf.hpp"
 
 #include <boost/asio.hpp>
@@ -21,11 +20,10 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <queue>
+#include <map>
 
 namespace dunedaq::asiolibs {
-
-class ConfigurationManager;
-class SocketDataWriterModule;
 
 class SocketWriterModule : public dunedaq::appfwk::DAQModule
 {
@@ -63,17 +61,17 @@ private:
     /**
      * @brief Total number of received payloads
      */
-    std::atomic<uint64_t> sum_payloads{ 0 };
+    std::atomic<uint64_t> sum_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Incremental number of received payloads 
      */
-    std::atomic<uint64_t> num_payloads{ 0 };   
+    std::atomic<uint64_t> num_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Total number of received bytes 
      */
-    std::atomic<uint64_t> sum_bytes{ 0 };  
+    std::atomic<uint64_t> sum_bytes{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Rate of consumed packets 
@@ -96,7 +94,7 @@ private:
     /**
      * @brief Source port number
      */
-    uint32_t local_port;
+    uint32_t local_port; // NOLINT(build/unsigned)
 
     /**
      * @brief Destination IP address
@@ -106,7 +104,7 @@ private:
     /**
      * @brief Destination port number
      */
-    uint32_t remote_port;
+    uint32_t remote_port; // NOLINT(build/unsigned)
 
     /**
      * @brief Statistics of socket traffic
@@ -275,7 +273,6 @@ private:
   std::jthread m_io_thread;
 
   /**
-  /**
    * @brief Socket writer infos
    */
   std::vector<std::shared_ptr<WriterInfo>> m_writer_infos;
@@ -290,7 +287,7 @@ private:
    */    
   std::vector<std::shared_ptr<GenericCallbackConcept>> m_raw_data_callbacks;
 
-  using sid_to_writer_map_t = std::map<uint32_t, std::shared_ptr<std::variant<TCPWriter, UDPWriter>>>;
+  using sid_to_writer_map_t = std::map<uint32_t, std::shared_ptr<std::variant<TCPWriter, UDPWriter>>>; // NOLINT(build/unsigned)
   /**
    * @brief Source ID to writer map
    */   
