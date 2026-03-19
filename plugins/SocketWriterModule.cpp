@@ -243,10 +243,10 @@ SocketWriterModule::TCPWriter::start()
 {
   while (!m_payloads.empty()) {
     auto payload = std::move(m_payloads.front());
-    m_payloads.pop();
-
+    
     auto bytes_sent =
-      co_await boost::asio::async_write(*m_socket, boost::asio::buffer(payload.data, payload.size), boost::asio::use_awaitable);
+    co_await boost::asio::async_write(*m_socket, boost::asio::buffer(payload.data, payload.size), boost::asio::use_awaitable);
+    m_payloads.pop();
 
     ++m_socket_stats->num_payloads;
     ++m_socket_stats->sum_payloads;
@@ -314,10 +314,10 @@ SocketWriterModule::UDPWriter::start()
 {
   while (!m_payloads.empty()) {
     auto payload = std::move(m_payloads.front());
-    m_payloads.pop();   
-
+    
     const auto bytes_sent = co_await m_socket->async_send_to(
-        boost::asio::buffer(payload.data, payload.size), m_remote_endpoint, boost::asio::use_awaitable);
+      boost::asio::buffer(payload.data, payload.size), m_remote_endpoint, boost::asio::use_awaitable);
+    m_payloads.pop();   
 
     ++m_socket_stats->num_payloads;
     ++m_socket_stats->sum_payloads;
