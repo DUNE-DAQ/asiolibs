@@ -81,7 +81,7 @@ private:
     /**
      * @brief Timeout on data inputs 
      */
-    std::atomic<uint64_t> queue_timeout_count{ 0 };   
+    std::atomic<uint64_t> queue_timeout_count{ 0 }; // NOLINT(build/unsigned)
 
     /**
      * @brief Rate of consumed packets 
@@ -308,12 +308,6 @@ private:
    * @brief Receiver timeout in ms
    */    
   std::chrono::milliseconds m_receiver_timeout_ms{ default_receiver_timeout_ms };
-
-  using sid_to_writer_map_t = std::map<uint32_t, std::shared_ptr<std::variant<TCPWriter, UDPWriter>>>; // NOLINT(build/unsigned)
-  /**
-   * @brief Source ID to writer map
-   */   
-  sid_to_writer_map_t m_sid_to_writer;
   
   // CONSUMER
   /**

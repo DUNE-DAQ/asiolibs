@@ -10,6 +10,10 @@
 
 #include "GenericReceiverConcept.hpp"
 
+#include <string>
+#include <utility>
+#include <memory>
+
 namespace dunedaq::asiolibs {
 
 template<class TargetPayloadType>

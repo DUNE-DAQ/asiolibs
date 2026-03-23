@@ -5,10 +5,12 @@
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
-#ifndef ASIOLIBS_PLUGINS_GENERICRECEIVERCONCEPT_HPP_
-#define ASIOLIBS_PLUGINS_GENERICRECEIVERCONCEPT_HPP_
+#ifndef ASIOLIBS_SRC_GENERICRECEIVERCONCEPT_HPP_
+#define ASIOLIBS_SRC_GENERICRECEIVERCONCEPT_HPP_
 
 #include "iomanager/Receiver.hpp"
+
+#include <memory>
 
 namespace dunedaq::asiolibs {
 
@@ -36,4 +38,4 @@ public:
 
 } // namespace dunedaq::asiolibs
 
-#endif // ASIOLIBS_PLUGINS_GENERICRECEIVERCONCEPT_HPP_
+#endif // ASIOLIBS_SRC_GENERICRECEIVERCONCEPT_HPP_

@@ -17,6 +17,7 @@
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include <memory>
+#include <string>
 
 DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTBernFrame, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTGrenobleFrame, "CRTGrenobleFrame")
