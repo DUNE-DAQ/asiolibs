@@ -8,7 +8,7 @@
 
 #include "SocketWriterModule.hpp"
 
-#include "CreateGenericCallback.hpp"
+#include "CreateGenericReceiver.hpp"
 
 #include "appfwk/ConfigurationManager.hpp"
 #include "appmodel/SocketDataSender.hpp"
@@ -41,22 +41,41 @@ SocketWriterModule::SocketWriterModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
+void 
+SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal)
+{
+  auto* con = mdal->get_inputs()[0]; // there's only 1 input  
+  auto* queue = con->cast<confmodel::Queue>();
+  if (queue == nullptr) {
+    auto err = datahandlinglibs::InitializationError(ERS_HERE, "Input is not of type Queue.");
+    ers::fatal(err);
+    throw err;
+  }
+
+  auto connection_name = queue->UID();
+
+  const auto recv_timeout_ms = con->get_recv_timeout_ms();
+  if (recv_timeout_ms == 0) {
+    ers::warning(InvalidRawReceiverTimeout(ERS_HERE, m_receiver_timeout_ms.count()));
+  } else {
+    m_receiver_timeout_ms = std::chrono::milliseconds(recv_timeout_ms);
+  }
+
+  m_receiver = createGenericReceiver(connection_name);
+  // Input connection sensibility check
+  if (m_receiver == nullptr) {
+    //ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!")); FIXME (DTE)
+  }
+}
+
 void
 SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcfg)
 {
   auto* mdal = mcfg->get_dal<appmodel::SocketDataWriterModule>(get_name());
 
-  if (mdal->get_raw_data_callbacks().empty()) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE, "No inputs defined for socket writer in configuration.");
-    ers::fatal(err);
-    throw err;
-  }
+  get_dal_inputs(mdal);
 
-  for (auto con : mdal->get_raw_data_callbacks()) {
-    m_raw_data_callback_confs.push_back(con);
-  }  
-
-  auto* d2d_conn = mdal->get_connections()[0]; // there's only 1 connection
+  auto* d2d_conn = mdal->get_connection();
   auto* socket_d2d_conn = d2d_conn->cast<appmodel::SocketDetectorToDaqConnection>();
   if (socket_d2d_conn == nullptr) {
     auto err = datahandlinglibs::InitializationError(ERS_HERE, "Connection is not of type SocketDetectorToDaqConnection.");
@@ -67,41 +86,26 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto nw_receiver = socket_d2d_conn->get_net_receiver();
   auto remote_ip = nw_receiver->get_uses()->get_ip_address()[0];
 
-  for (auto nw_sender : socket_d2d_conn->get_net_senders()) {
-    if (nw_sender->is_disabled(*(mcfg->get_session()))) {
-      continue;
-    }    
+  auto* nw_sender = socket_d2d_conn->get_net_senders()[0]; // there's only 1 sender   
 
-    auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
-    if (socket_sender == nullptr) {
-      auto err = datahandlinglibs::InitializationError(ERS_HERE, "Sender is not of type SocketDataSender.");
-      ers::fatal(err);
-      throw err;
-    }  
+  auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
+  if (socket_sender == nullptr) {
+    auto err = datahandlinglibs::InitializationError(ERS_HERE, "Sender is not of type SocketDataSender.");
+    ers::fatal(err);
+    throw err;
+  }  
 
-    auto local_ip = socket_sender->get_uses()->get_ip_address()[0];
-    auto local_port = socket_sender->get_local_port();
-    auto remote_port = socket_sender->get_remote_port();
+  auto local_ip = socket_sender->get_uses()->get_ip_address()[0];
+  auto local_port = socket_sender->get_local_port();
+  auto remote_port = socket_sender->get_remote_port();
+  
+  m_writer_info = std::make_shared<WriterInfo>(local_ip, local_port, remote_ip, remote_port, std::make_shared<SocketStats>());
     
-    m_writer_infos.emplace_back(
-      std::make_shared<WriterInfo>(
-        local_ip, local_port, remote_ip, remote_port, std::make_shared<SocketStats>()));
-      
-    if (string_to_socket_type(socket_sender->get_socket_type()) == SocketType::TCP) {
-      m_writers.push_back(std::make_shared<std::variant<TCPWriter, UDPWriter>>(TCPWriter{}));
-    } else {
-      m_writers.push_back(std::make_shared<std::variant<TCPWriter, UDPWriter>>(UDPWriter{}));      
-    }     
-
-    // Loop over streams
-    for (auto det_stream : socket_sender->get_streams()) {
-      if (det_stream->is_disabled(*(mcfg->get_session()))) {
-        continue;
-      }
-      auto sid = det_stream->get_source_id();
-      m_sid_to_writer[sid] = m_writers.back();
-    }      
-  }
+  if (string_to_socket_type(socket_sender->get_socket_type()) == SocketType::TCP) {
+    m_writer = std::make_shared<std::variant<TCPWriter, UDPWriter>>(TCPWriter{});
+  } else {
+    m_writer = std::make_shared<std::variant<TCPWriter, UDPWriter>>(UDPWriter{});      
+  }    
 }
 
 SocketWriterModule::SocketType
@@ -118,50 +122,53 @@ SocketWriterModule::string_to_socket_type(const std::string& socket_type) const
 void
 SocketWriterModule::do_configure(const CommandData_t&)
 {
-  for (auto conf : m_raw_data_callback_confs) {
-    auto sid = conf->get_source_id();
-
-    auto cb = createGenericCallback(conf, 
-      [this, sid](GenericCallbackConcept::TypeErasedPayload&& payload) {
-        auto it = m_sid_to_writer.find(sid);
-        if (it != m_sid_to_writer.end()) {
-            std::visit([&](auto& writer) { writer.enqueue(std::move(payload)); }, *it->second);
-        } else {
-            TLOG() << "No socket writer found for source_id " << sid;
-        }
-      });
-
-    m_raw_data_callbacks.push_back(std::move(cb));
-  }
-
-  for (std::size_t i = 0; i < m_writers.size(); ++i) {
-    auto writer_info = m_writer_infos[i];
-    std::visit([this, writer_info](auto& writer) { writer.configure(m_io_context, writer_info); }, *m_writers[i]);    
-  }
+  std::visit([this](auto& writer) { writer.configure(m_io_context, m_writer_info); }, *m_writer);    
 }
 
 void
 SocketWriterModule::do_start(const CommandData_t&)
 {
-  for (const auto& writer_info : m_writer_infos) {
-    // Reset opmon variables
-    writer_info->socket_stats->sum_payloads = 0;
-    writer_info->socket_stats->num_payloads = 0;
-    writer_info->socket_stats->sum_bytes = 0;
-    writer_info->socket_stats->stats_packet_count = 0;
-  }
+  // Reset opmon variables
+  m_writer_info->socket_stats->sum_payloads = 0;
+  m_writer_info->socket_stats->num_payloads = 0;
+  m_writer_info->socket_stats->sum_bytes = 0;
+  m_writer_info->socket_stats->stats_packet_count = 0;
 
   m_t0 = std::chrono::steady_clock::now();
+
+  m_run_marker.store(true);
+  m_consumer_thread.set_work(&SocketWriterModule::run_consume, this);
 
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 }
 
+void 
+SocketWriterModule::run_consume()
+{
+  TLOG() << "Consumer thread started..."; // TODO (DTE): Make debug logs
+
+  while (m_run_marker.load()) {
+    // Try to acquire data
+    if (auto opt_payload = m_receiver->try_receive(m_receiver_timeout_ms)) {
+      std::visit([&](auto& writer) { writer.enqueue(std::move(*opt_payload)); }, *m_writer);
+    } else {
+      std::visit([&](auto& writer) { ++writer.get_socket_stats()->queue_timeout_count; }, *m_writer);
+    }
+  }
+
+  TLOG() << "Consumer thread joins... ";
+}
+
+
 void
 SocketWriterModule::do_stop(const CommandData_t&)
 {
-  for (auto& writer : m_writers) {
-    std::visit([](auto& writer) { writer.stop(); }, *writer);
+  m_run_marker.store(false);
+  while (!m_consumer_thread.get_readiness()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
+
+  std::visit([this](auto& writer) { writer.stop(); }, *m_writer);
 
   m_work_guard.reset();
 }
@@ -169,21 +176,19 @@ SocketWriterModule::do_stop(const CommandData_t&)
 void
 SocketWriterModule::generate_opmon_data()
 {
-  for (const auto& writer_info : m_writer_infos) {
-    opmon::SocketWriterStats stats;
-    stats.set_sum_payloads(writer_info->socket_stats->sum_payloads.load());
-    stats.set_num_payloads(writer_info->socket_stats->num_payloads.exchange(0));
-    stats.set_sum_bytes(writer_info->socket_stats->sum_bytes.load());
+  opmon::SocketWriterStats stats;
+  stats.set_sum_payloads(m_writer_info->socket_stats->sum_payloads.load());
+  stats.set_num_payloads(m_writer_info->socket_stats->num_payloads.exchange(0));
+  stats.set_sum_bytes(m_writer_info->socket_stats->sum_bytes.load());
 
-    auto now = std::chrono::steady_clock::now();
-    int new_packets = writer_info->socket_stats->stats_packet_count.exchange(0);
-    double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
-    m_t0 = now;
+  auto now = std::chrono::steady_clock::now();
+  int new_packets = m_writer_info->socket_stats->stats_packet_count.exchange(0);
+  double seconds = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t0).count() / 1000000.;
+  m_t0 = now;
 
-    stats.set_rate_payloads_consumed(new_packets / seconds / 1000.);
+  stats.set_rate_payloads_consumed(new_packets / seconds / 1000.);
 
-    publish(std::move(stats), { { "socket-writer", writer_info->local_ip + ":" + std::to_string(writer_info->local_port) } });
-  }
+  publish(std::move(stats), { { "socket-writer", m_writer_info->local_ip + ":" + std::to_string(m_writer_info->local_port) } });
 }
 
 void
@@ -228,7 +233,7 @@ SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, st
 }
 
 void
-SocketWriterModule::TCPWriter::enqueue(GenericCallbackConcept::TypeErasedPayload&& payload)
+SocketWriterModule::TCPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload&& payload)
 {
   boost::asio::post(*m_strand, [this, payload = std::move(payload)]() mutable {
     m_payloads.push(std::move(payload));
@@ -299,7 +304,7 @@ SocketWriterModule::UDPWriter::configure(boost::asio::io_context& io_context, st
 }
 
 void
-SocketWriterModule::UDPWriter::enqueue(GenericCallbackConcept::TypeErasedPayload&& payload)
+SocketWriterModule::UDPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload&& payload)
 {
   boost::asio::post(*m_strand, [this, payload = std::move(payload)]() mutable {
     m_payloads.push(std::move(payload));
