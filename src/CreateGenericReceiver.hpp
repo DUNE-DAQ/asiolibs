@@ -11,34 +11,35 @@
 #include "GenericReceiverConcept.hpp"
 #include "GenericReceiverModel.hpp"
 
-#include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
-#include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
+#include "fddetdataformats/CRTBernFrame.hpp"
+#include "fddetdataformats/CRTGrenobleFrame.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include <memory>
+#include <string>
 
-DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
-DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTBernFrame, "CRTBernFrame")
+DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTGrenobleFrame, "CRTGrenobleFrame")
 
 namespace dunedaq::asiolibs {
  
 std::shared_ptr<GenericReceiverConcept>
-createGenericReceiver(const std::string& conn_uid, const std::string& raw_data_receiver_connection_name)
+createGenericReceiver(const std::string& receiver_connection_name)
 {
-  const auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(conn_uid);
+  const auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(receiver_connection_name);
   if (datatypes.size() != 1) {
-    ers::error(dunedaq::datahandlinglibs::GenericConfigurationError(ERS_HERE,
-      "Multiple output data types specified! Expected only a single type!"));
+    ers::error(datahandlinglibs::GenericConfigurationError(ERS_HERE,
+      "Multiple input data types specified! Expected only a single type!"));
   }
-  const std::string raw_dt = *datatypes.begin();
-  TLOG() << "Choosing specializations for GenericReceiverConcept for output connection "
-         << " [uid:" << conn_uid << " , data_type:" << raw_dt << ']';
+  const std::string dt = *datatypes.begin();
+  TLOG() << "Choosing specializations for GenericReceiverConcept for input connection "
+         << " [uid:" << receiver_connection_name << " , data_type:" << dt << ']';
 
-  if (raw_dt.find("CRTBernFrame") != std::string::npos) {
-    return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTBernTypeAdapter>>(raw_data_receiver_connection_name);
-  } else if (raw_dt.find("CRTGrenobleFrame") != std::string::npos) {
-    return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>(raw_data_receiver_connection_name);
+  if (dt.find("CRTBernFrame") != std::string::npos) {
+    return std::make_shared<GenericReceiverModel<fddetdataformats::CRTBernFrame>>(receiver_connection_name);
+  } else if (dt.find("CRTGrenobleFrame") != std::string::npos) {
+    return std::make_shared<GenericReceiverModel<fddetdataformats::CRTGrenobleFrame>>(receiver_connection_name);
   }
 
   return nullptr;

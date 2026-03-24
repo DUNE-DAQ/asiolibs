@@ -28,7 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
-
+#include <utility>
 
 namespace dunedaq::asiolibs {
 
@@ -61,44 +61,43 @@ public:
       }
   }
 
-  bool handle_payload(char* message, std::size_t size) // NOLINT(build/unsigned)
+  // Process an incoming raw byte buffer and extract complete frames of type TargetPayloadType.
+  void handle_daq_frame(char* buffer) override
   {
-    bool push_out = true;
-    if (push_out) {
+    // Materialize a real TargetPayloadType object by copying bytes from the buffer.
+    // This is defined behavior, alignment-safe, and fast, without pointer vodoo
+    // Previously reinterpret_cast to TargetPayloadType* introduced alignment traps 
+    // “pretend there’s a constructed object there” UB. 
+    TargetPayloadType frame;
+    std::memcpy(&frame, buffer, m_expected_frame_size);
 
-      TargetPayloadType& target_payload = *reinterpret_cast<TargetPayloadType*>(message);
-  
-        (*m_sink_callback)(std::move(target_payload));
-
-    } else {
-      TargetPayloadType target_payload;
-      uint32_t bytes_copied = 0;
-      datahandlinglibs::buffer_copy(message, size, static_cast<void*>(&target_payload), bytes_copied, sizeof(target_payload));
-    }
-
-    return true;
+     // Pass by value (moved); no references into 'buffer', so no UAF.
+    (*m_sink_callback)(std::move(frame));
   }
 
-  std::size_t get_target_payload_size() const override {
-    TargetPayloadType target_payload; 
-    return target_payload.get_frame_size(); // TODO (DTE): Could be a static function?
+  std::size_t get_expected_frame_size() const override {
+    return m_expected_frame_size;
   }
     
   void generate_opmon_data() override {
 
     opmon::SourceInfo info;
-    info.set_dropped_frames( m_dropped_packets.load() ); 
+    info.set_leftover_bytes_encountered( m_leftover_bytes_encountered.exchange(0) );
 
     publish( std::move(info) );
   }
   
 private:
+  // Constants
+  const std::size_t m_expected_frame_size = sizeof(TargetPayloadType);
+
   // Callback internals
   bool m_callback_is_acquired{ false };
   using sink_cb_t = std::shared_ptr<std::function<void(TargetPayloadType&&)>>;
   sink_cb_t m_sink_callback;
 
-  std::atomic<uint64_t> m_dropped_packets{0};
+  // Stats  
+  std::atomic<uint64_t> m_leftover_bytes_encountered{0}; // NOLINT(build/unsigned)
 
 };
 
