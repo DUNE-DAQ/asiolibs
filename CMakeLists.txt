@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(asiolibs VERSION 1.2.2)
+project(asiolibs VERSION 1.2.3)
 
 find_package(daq-cmake REQUIRED)
 
