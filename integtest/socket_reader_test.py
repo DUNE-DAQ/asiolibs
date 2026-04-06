@@ -16,7 +16,7 @@ number_of_readout_apps = 1
 run_duration = 20  # seconds
 
 # Default values for validation parameters
-expected_number_of_data_files = 1
+expected_number_of_data_files = 2
 check_for_logfile_errors = True
 hostname = os.uname().nodename
 
@@ -115,6 +115,9 @@ confgen_arguments = {
 nanorc_command_list = "boot conf".split()
 nanorc_command_list += (
     "start --run-number 101 wait 5 enable-triggers wait ".split()
+    + [str(run_duration)]
+    + "disable-triggers wait 1 drain-dataflow wait 2 stop-trigger-sources wait 1 stop wait 2".split()
+    + "start --run-number 102 wait 5 enable-triggers wait ".split()
     + [str(run_duration)]
     + "disable-triggers wait 1 drain-dataflow wait 2 stop-trigger-sources wait 1 stop wait 2".split()
 )
