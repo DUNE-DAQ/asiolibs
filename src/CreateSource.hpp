@@ -13,7 +13,6 @@
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
-#include "fdreadoutlibs/TDEFrameTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
 
@@ -23,7 +22,6 @@
 namespace dunedaq {
 
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::DUNEWIBEthTypeAdapter, "WIBEthFrame")
-DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::TDEFrameTypeAdapter, "TDEFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
 
@@ -58,13 +56,13 @@ createSourceModel(const appmodel::DataMoveCallbackConf* conf)
     // Return with setup model
     return source_model;
 
-  } else if (datatype.find("TDEFrame") != std::string::npos) {
-    // WIB2 specific char arrays
-    auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::TDEFrameTypeAdapter>>();
-    source_model->set_sink_config(conf);
-    //auto& parser = source_model->get_parser();
-    //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::DUNEWIBSuperChunkTypeAdapter>(sink);
-    return source_model;
+  // } else if (datatype.find("TDEFrame") != std::string::npos) {
+  //   // WIB2 specific char arrays
+  //   auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::TDEFrameTypeAdapter>>();
+  //   source_model->set_sink_config(conf);
+  //   //auto& parser = source_model->get_parser();
+  //   //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::DUNEWIBSuperChunkTypeAdapter>(sink);
+  //   return source_model;
   } else if (datatype.find("CRTBernFrame") != std::string::npos) {
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTBernTypeAdapter>>();
     source_model->set_sink_config(conf);
