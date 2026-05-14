@@ -6,9 +6,9 @@ Boost.Asio-based socket reader plugin for low-bandwidth devices
 
 `local-crt-bern1x1-config` and `local-crt-grenoble-1x1-config` (defined in `daqsystemtest/config/daqsystemtest/example-configs.data.xml`) are session configurations with a CRT reader application accompanied by a socket reader application.
 
-CRT reader application includes a data reader (either `CRTBernReaderModule` or `CRTGrenobleReaderModule`) which reads data from the hardware then puts it into a queue and data writers (`SocketWriterModule`) which read data from the queue then send it over a socket.
+CRT reader application includes a data reader (`CRTGrenobleReaderModule`) which reads data from the hardware then puts it into a queue and data writers (`SocketWriterModule`) which read data from the queue then send it over a socket.
 
-Socket reader application includes a data reader (`SocketReaderModule`) which reads data from the socket (`CRTBernFrame`/`CRTGrenobleFrame`) then puts it into another queue to be processed by `DataHandlingModel`.
+Socket reader application includes a data reader (`SocketReaderModule`) which reads data from the socket (`CRTGrenobleFrame`) then puts it into another queue to be processed by `DataHandlingModel`.
 
 ![crt-reader-and-readout-apps](crt-reader-and-readout-apps.png)
 

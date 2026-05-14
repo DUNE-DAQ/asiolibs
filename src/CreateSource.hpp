@@ -13,7 +13,6 @@
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
-#include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
 
 #include <memory>
@@ -22,7 +21,6 @@
 namespace dunedaq {
 
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::DUNEWIBEthTypeAdapter, "WIBEthFrame")
-DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
 
 namespace asiolibs {
@@ -63,10 +61,6 @@ createSourceModel(const appmodel::DataMoveCallbackConf* conf)
   //   //auto& parser = source_model->get_parser();
   //   //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::DUNEWIBSuperChunkTypeAdapter>(sink);
   //   return source_model;
-  } else if (datatype.find("CRTBernFrame") != std::string::npos) {
-    auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTBernTypeAdapter>>();
-    source_model->set_sink_config(conf);
-    return source_model;
   } else if (datatype.find("CRTGrenobleFrame") != std::string::npos) {
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>();
     source_model->set_sink_config(conf);
