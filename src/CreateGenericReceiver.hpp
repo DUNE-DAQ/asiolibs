@@ -11,12 +11,14 @@
 #include "GenericReceiverConcept.hpp"
 #include "GenericReceiverModel.hpp"
 
+#include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include <memory>
 
+DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTBernTypeAdapter, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fdreadoutlibs::types::CRTGrenobleTypeAdapter, "CRTGrenobleFrame")
 
 namespace dunedaq::asiolibs {
@@ -33,7 +35,9 @@ createGenericReceiver(const std::string& conn_uid, const std::string& raw_data_r
   TLOG() << "Choosing specializations for GenericReceiverConcept for output connection "
          << " [uid:" << conn_uid << " , data_type:" << raw_dt << ']';
 
-  if (raw_dt.find("CRTGrenobleFrame") != std::string::npos) {
+  if (raw_dt.find("CRTBernFrame") != std::string::npos) {
+    return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTBernTypeAdapter>>(raw_data_receiver_connection_name);
+  } else if (raw_dt.find("CRTGrenobleFrame") != std::string::npos) {
     return std::make_shared<GenericReceiverModel<fdreadoutlibs::types::CRTGrenobleTypeAdapter>>(raw_data_receiver_connection_name);
   }
 
