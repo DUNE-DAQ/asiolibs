@@ -56,13 +56,6 @@ createSourceModel(const appmodel::DataMoveCallbackConf* conf)
     // Return with setup model
     return source_model;
 
-  // } else if (datatype.find("TDEFrame") != std::string::npos) {
-  //   // WIB2 specific char arrays
-  //   auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::TDEFrameTypeAdapter>>();
-  //   source_model->set_sink_config(conf);
-  //   //auto& parser = source_model->get_parser();
-  //   //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::DUNEWIBSuperChunkTypeAdapter>(sink);
-  //   return source_model;
   } else if (datatype.find("CRTBernFrame") != std::string::npos) {
     auto source_model = std::make_shared<SourceModel<fdreadoutlibs::types::CRTBernTypeAdapter>>();
     source_model->set_sink_config(conf);
