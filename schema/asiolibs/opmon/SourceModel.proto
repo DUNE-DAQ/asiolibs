@@ -4,6 +4,6 @@ package dunedaq.asiolibs.opmon;
 
 message SourceInfo {
 
-  uint32 dropped_frames = 1;
-  
+  uint64 leftover_bytes_encountered  = 1;
+
 }

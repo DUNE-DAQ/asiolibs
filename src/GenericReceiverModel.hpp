@@ -10,14 +10,18 @@
 
 #include "GenericReceiverConcept.hpp"
 
+#include <string>
+#include <utility>
+#include <memory>
+
 namespace dunedaq::asiolibs {
 
 template<class TargetPayloadType>
 class GenericReceiverModel : public GenericReceiverConcept
 {
 public:
-  explicit GenericReceiverModel(const std::string& raw_data_receiver_connection_name)
-    : m_receiver(get_iom_receiver<TargetPayloadType>(raw_data_receiver_connection_name))
+  explicit GenericReceiverModel(const std::string& receiver_connection_name)
+    : m_receiver(get_iom_receiver<TargetPayloadType>(receiver_connection_name))
   {}
 
   std::optional<TypeErasedPayload> try_receive(dunedaq::iomanager::Receiver::timeout_t timeout) override {

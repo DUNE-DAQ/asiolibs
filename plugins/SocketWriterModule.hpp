@@ -20,19 +20,18 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <queue>
+#include <map>
 
 namespace dunedaq::asiolibs {
-
-class ConfigurationManager;
-class SocketDataWriterModule;
 
 class SocketWriterModule : public dunedaq::appfwk::DAQModule
 {
 public:
   /**
-   * @brief Default raw data receiver timeout in ms
+   * @brief Default receiver timeout in ms
    */
-  static constexpr auto raw_receiver_timeout_ms = 10;
+  static constexpr auto default_receiver_timeout_ms = 10;
 
   /**
    * @brief SocketWriterModule constructor
@@ -67,36 +66,46 @@ private:
     /**
      * @brief Total number of received payloads
      */
-    std::atomic<uint64_t> sum_payloads{ 0 };
+    std::atomic<uint64_t> sum_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Incremental number of received payloads
+     * @brief Incremental number of received payloads 
      */
-    std::atomic<uint64_t> num_payloads{ 0 };
+    std::atomic<uint64_t> num_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Total number of received bytes
+     * @brief Total number of received bytes 
      */
-    std::atomic<uint64_t> sum_bytes{ 0 };
+    std::atomic<uint64_t> sum_bytes{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Timeout on data inputs
+     * @brief Timeout on data inputs 
      */
-    std::atomic<uint64_t> rawq_timeout_count{ 0 };
+    std::atomic<uint64_t> queue_timeout_count{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Rate of consumed packets
+     * @brief Rate of consumed packets 
      */
     std::atomic<double> rate_payloads_consumed{ 0 };
-
+    
     /**
      * @brief Counts packets since last opmon data generation
      */
-    std::atomic<int> stats_packet_count{ 0 };
+    std::atomic<int> stats_packet_count{ 0 };    
   };
 
-  struct WriterConfig
+  struct WriterInfo
   {
+    /**
+     * @brief Source IP address
+     */
+    std::string local_ip;
+
+    /**
+     * @brief Source port number
+     */
+    uint32_t local_port; // NOLINT(build/unsigned)
+
     /**
      * @brief Destination IP address
      */
@@ -105,7 +114,7 @@ private:
     /**
      * @brief Destination port number
      */
-    ushort remote_port;
+    uint32_t remote_port; // NOLINT(build/unsigned)
 
     /**
      * @brief Statistics of socket traffic
@@ -118,25 +127,36 @@ private:
   public:
     /**
      * @brief Creates and connects a TCP socket
-     * @param io_context I/O context for socket creation
-     * @param writer_config TCP writer configuration
+     * @param io_context I/O context for socket creation and coroutine spawn
+     * @param writer_info TCP writer info
      * @throws boost::system::system_error on failure
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info);
 
     /**
-     * @brief Asynchronously sends payloads to the socket in a loop
+     * @brief Enqueues payload
      * @param payload Payload to send
-     * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericReceiverConcept::TypeErasedPayload&& payload);
 
     /**
      * @brief Closes the socket
      */
     void stop();
 
+    /**
+     * @brief Get socket statistics
+     * @return Statistics of socket traffic
+     */    
+    std::shared_ptr<SocketStats> get_socket_stats() const;    
+
   private:
+    /**
+     * @brief Asynchronously sends payloads to the socket in a loop
+     * @return Coroutine handle
+     */
+    boost::asio::awaitable<void> start();
+
     /**
      * @brief TCP socket
      */
@@ -146,6 +166,21 @@ private:
      * @brief Statistics of socket traffic
      */
     std::shared_ptr<SocketStats> m_socket_stats;
+
+    /**
+     * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
+     */
+    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+
+    /**
+    * @brief I/O context for socket operations
+    */
+    boost::asio::io_context* m_io_context;
+
+    /**
+    * @brief Ensures no race on queue
+    */    
+    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;
   };
 
   class UDPWriter
@@ -153,33 +188,64 @@ private:
   public:
     /**
      * @brief Creates a UDP socket
-     * @param io_context I/O context for socket creation
-     * @param writer_config UDP writer configuration
+     * @param io_context I/O context for socket creation and coroutine spawn
+     * @param writer_info UDP writer info
      */
-    void configure(boost::asio::io_context& io_context, const WriterConfig& writer_config);
+    void configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info);
 
     /**
-     * @brief Asynchronously sends payloads to the socket in a loop
+     * @brief Enqueues payload
      * @param payload Payload to send
-     * @return Coroutine handle
      */
-    boost::asio::awaitable<void> start(GenericReceiverConcept::TypeErasedPayload payload);
+    void enqueue(GenericReceiverConcept::TypeErasedPayload&& payload);
 
     /**
      * @brief Closes the socket
      */
     void stop();
 
+    /**
+     * @brief Get socket statistics
+     * @return Statistics of socket traffic
+     */    
+    std::shared_ptr<SocketStats> get_socket_stats() const;
+
   private:
+    /**
+     * @brief Asynchronously sends payloads to the socket in a loop
+     * @return Coroutine handle
+     */
+    boost::asio::awaitable<void> start();
+
     /**
      * @brief UDP socket
      */
     std::unique_ptr<boost::asio::ip::udp::socket> m_socket;
 
     /**
-     * @brief Socket writer configuration
+     * @brief Statistics of socket traffic
      */
-    WriterConfig m_writer_config;
+    std::shared_ptr<SocketStats> m_socket_stats;
+
+    /**
+     * @brief Payloads waiting to be sent (ensures no simultaneous async_write calls)
+     */
+    std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
+
+    /**
+    * @brief I/O context for socket operations
+    */
+    boost::asio::io_context* m_io_context;    
+
+    /**
+    * @brief Remote endpoint
+    */
+    boost::asio::ip::udp::endpoint m_remote_endpoint;
+
+    /**
+    * @brief Ensures no race on queue
+    */    
+    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;    
   };
 
   // Commands
@@ -197,10 +263,15 @@ private:
   SocketType string_to_socket_type(const std::string& socket_type) const;
 
   /**
-   * @brief Raw data consume callback function
-   * @param payload Consumed data
-   */
-  void consume_payload(GenericReceiverConcept::TypeErasedPayload payload);
+   * @brief Gets dal inputs
+   * @param mdal SocketDataWriterModule dal
+   */   
+  void get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal);
+
+  /**
+   * @brief Data consume thread function
+   */   
+  void run_consume();
 
   /**
    * @brief I/O context for socket operations
@@ -213,9 +284,9 @@ private:
   boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_work_guard;
 
   /**
-   * @brief Socket writers
+   * @brief Socket writer
    */
-  std::vector<std::variant<TCPWriter, UDPWriter>> m_writers;
+  std::shared_ptr<std::variant<TCPWriter, UDPWriter>> m_writer;
 
   /**
    * @brief Background thread to keep the I/O context running
@@ -223,36 +294,37 @@ private:
   std::jthread m_io_thread;
 
   /**
-   * @brief Type of socket
+   * @brief Socket writer info
    */
-  SocketType m_socket_type{ SocketType::INVALID };
+  std::shared_ptr<WriterInfo> m_writer_info;
+
+  // RECEIVER  
+  /**
+   * @brief Generic receiver
+   */    
+  std::shared_ptr<GenericReceiverConcept> m_receiver;
 
   /**
-   * @brief Socket writer configurations
-   */
-  std::vector<WriterConfig> m_writer_configs;
+   * @brief Receiver timeout in ms
+   */    
+  std::chrono::milliseconds m_receiver_timeout_ms{ default_receiver_timeout_ms };
+  
+  // CONSUMER
+  /**
+   * @brief Data consume thread
+   */     
+  utilities::ReusableThread m_consumer_thread;
 
   /**
-   * @brief DAQ configuration data
-   */
-  std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
-
-  /**
-   * @brief Configuration object for the callbacks
-   */
-  const appmodel::DataMoveCallbackConf* m_callback_conf;
-
-  // Consume callback
-  /**
-   * @brief Raw data consume callback
-   */
-  std::function<void(GenericReceiverConcept::TypeErasedPayload payload)> m_consume_callback;
+   * @brief Whether consumer thread should continue
+   */    
+  std::atomic<bool> m_run_marker { false };
 
   // RUN START T0
   /**
    * @brief Timestamp used to measure time between opmon reports
-   */
-  std::chrono::time_point<std::chrono::steady_clock> m_t0;
+   */   
+  std::chrono::time_point<std::chrono::steady_clock> m_t0;  
 };
 
 } // namespace dunedaq::asiolibs
