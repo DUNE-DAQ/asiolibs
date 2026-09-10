@@ -69,7 +69,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto local_ip = nw_receiver->get_uses()->get_ip_address()[0];
 
   for (auto nw_sender : socket_d2d_conn->get_net_senders()) {
-    if (nw_sender->is_disabled(*(mcfg->get_session()))) {
+    if (nw_sender->is_excluded(*(mcfg->get_session()))) {
       continue;
     }
 
@@ -97,7 +97,7 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
 
     // Loop over streams
     for (auto det_stream : socket_sender->get_streams()) {
-      if (det_stream->is_disabled(*(mcfg->get_session()))) {
+      if (det_stream->is_excluded(*(mcfg->get_session()))) {
         continue;
       }
 
