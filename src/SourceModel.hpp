@@ -10,7 +10,6 @@
 
 #include "SourceConcept.hpp"
 
-
 #include "iomanager/IOManager.hpp"
 #include "iomanager/Sender.hpp"
 #include "logging/Logging.hpp"
@@ -19,7 +18,7 @@
 
 // #include "datahandlinglibs/utils/ReusableThread.hpp"
 #include "datahandlinglibs/DataMoveCallbackRegistry.hpp"
-#include "datahandlinglibs/utils/BufferCopy.hpp" 
+#include "datahandlinglibs/utils/BufferCopy.hpp"
 
 // #include <folly/ProducerConsumerQueue.h>
 // #include <nlohmann/json.hpp>
@@ -46,19 +45,20 @@ public:
    */
   SourceModel()
     : SourceConcept()
-  {}
+  {
+  }
   ~SourceModel() {}
 
   void acquire_callback() override
   {
-      if (m_callback_is_acquired) {
-        TLOG_DEBUG(5) << "SourceModel callback is already acquired!";
-      } else {
-        // Getting DataMoveCBRegistry
-        auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
-        m_sink_callback = dmcbr->get_callback<TargetPayloadType>(inherited::m_sink_conf);
-        m_callback_is_acquired = true;
-      }
+    if (m_callback_is_acquired) {
+      TLOG_DEBUG(5) << "SourceModel callback is already acquired!";
+    } else {
+      // Getting DataMoveCBRegistry
+      auto dmcbr = datahandlinglibs::DataMoveCallbackRegistry::get();
+      m_sink_callback = dmcbr->get_callback<TargetPayloadType>(inherited::m_sink_conf);
+      m_callback_is_acquired = true;
+    }
   }
 
   // Process an incoming raw byte buffer and extract complete frames of type TargetPayloadType.
@@ -66,27 +66,26 @@ public:
   {
     // Materialize a real TargetPayloadType object by copying bytes from the buffer.
     // This is defined behavior, alignment-safe, and fast, without pointer vodoo
-    // Previously reinterpret_cast to TargetPayloadType* introduced alignment traps 
-    // “pretend there’s a constructed object there” UB. 
+    // Previously reinterpret_cast to TargetPayloadType* introduced alignment traps
+    // “pretend there’s a constructed object there” UB.
     TargetPayloadType frame;
     std::memcpy(&frame, buffer, m_expected_frame_size);
 
-     // Pass by value (moved); no references into 'buffer', so no UAF.
+    // Pass by value (moved); no references into 'buffer', so no UAF.
     (*m_sink_callback)(std::move(frame));
   }
 
-  std::size_t get_expected_frame_size() const override {
-    return m_expected_frame_size;
-  }
-    
-  void generate_opmon_data() override {
+  std::size_t get_expected_frame_size() const override { return m_expected_frame_size; }
+
+  void generate_opmon_data() override
+  {
 
     opmon::SourceInfo info;
-    info.set_leftover_bytes_encountered( m_leftover_bytes_encountered.exchange(0) );
+    info.set_leftover_bytes_encountered(m_leftover_bytes_encountered.exchange(0));
 
-    publish( std::move(info) );
+    publish(std::move(info));
   }
-  
+
 private:
   // Constants
   const std::size_t m_expected_frame_size = sizeof(TargetPayloadType);
@@ -96,9 +95,8 @@ private:
   using sink_cb_t = std::shared_ptr<std::function<void(TargetPayloadType&&)>>;
   sink_cb_t m_sink_callback;
 
-  // Stats  
-  std::atomic<uint64_t> m_leftover_bytes_encountered{0}; // NOLINT(build/unsigned)
-
+  // Stats
+  std::atomic<uint64_t> m_leftover_bytes_encountered{ 0 }; // NOLINT(build/unsigned)
 };
 
 } // namespace dunedaq::asiolibs

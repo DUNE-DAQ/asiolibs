@@ -12,9 +12,9 @@
 #include "SourceModel.hpp"
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
-#include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTBernTypeAdapter.hpp"
 #include "fdreadoutlibs/CRTGrenobleTypeAdapter.hpp"
+#include "fdreadoutlibs/DUNEWIBEthTypeAdapter.hpp"
 
 #include <memory>
 #include <string>
@@ -42,13 +42,14 @@ createSourceModel(const appmodel::DataMoveCallbackConf* conf)
     source_model->set_sink_config(conf);
 
     // Get parser and sink
-    //auto& parser = source_model->get_parser();
-    //auto& sink = source_model->get_sink();
-    //auto& error_sink = source_model->get_error_sink();
+    // auto& parser = source_model->get_parser();
+    // auto& sink = source_model->get_sink();
+    // auto& error_sink = source_model->get_error_sink();
 
     // Modify parser as needed...
-    //parser.process_chunk_func = parsers::fixsizedChunkInto<fdreadoutlibs::types::ProtoWIBSuperChunkTypeAdapter>(sink);
-    //if (error_sink != nullptr) {
+    // parser.process_chunk_func =
+    // parsers::fixsizedChunkInto<fdreadoutlibs::types::ProtoWIBSuperChunkTypeAdapter>(sink); if (error_sink != nullptr)
+    // {
     //  parser.process_chunk_with_error_func = parsers::errorChunkIntoSink(error_sink);
     //}
     // parser.process_block_func = ...

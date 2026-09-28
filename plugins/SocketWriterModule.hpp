@@ -17,11 +17,11 @@
 
 #include <boost/asio.hpp>
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <queue>
 #include <map>
+#include <memory>
+#include <queue>
+#include <string>
+#include <vector>
 
 namespace dunedaq::asiolibs {
 
@@ -40,12 +40,10 @@ public:
   explicit SocketWriterModule(const std::string& name);
   ~SocketWriterModule() = default;
 
-  SocketWriterModule(const SocketWriterModule&) = delete; ///< SocketWriterModule is not copy-constructible
-  SocketWriterModule& operator=(const SocketWriterModule&) =
-    delete;                                                  ///< SocketWriterModule is not copy-assignable
-  SocketWriterModule(SocketWriterModule&&) = delete; ///< SocketWriterModule is not move-constructible
-  SocketWriterModule& operator=(SocketWriterModule&&) =
-    delete; ///< SocketWriterModule is not move-assignable
+  SocketWriterModule(const SocketWriterModule&) = delete;            ///< SocketWriterModule is not copy-constructible
+  SocketWriterModule& operator=(const SocketWriterModule&) = delete; ///< SocketWriterModule is not copy-assignable
+  SocketWriterModule(SocketWriterModule&&) = delete;                 ///< SocketWriterModule is not move-constructible
+  SocketWriterModule& operator=(SocketWriterModule&&) = delete;      ///< SocketWriterModule is not move-assignable
 
   /**
    * @brief Handles initialization on boot
@@ -69,29 +67,29 @@ private:
     std::atomic<uint64_t> sum_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Incremental number of received payloads 
+     * @brief Incremental number of received payloads
      */
     std::atomic<uint64_t> num_payloads{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Total number of received bytes 
+     * @brief Total number of received bytes
      */
     std::atomic<uint64_t> sum_bytes{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Timeout on data inputs 
+     * @brief Timeout on data inputs
      */
     std::atomic<uint64_t> queue_timeout_count{ 0 }; // NOLINT(build/unsigned)
 
     /**
-     * @brief Rate of consumed packets 
+     * @brief Rate of consumed packets
      */
     std::atomic<double> rate_payloads_consumed{ 0 };
-    
+
     /**
      * @brief Counts packets since last opmon data generation
      */
-    std::atomic<int> stats_packet_count{ 0 };    
+    std::atomic<int> stats_packet_count{ 0 };
   };
 
   struct WriterInfo
@@ -147,8 +145,8 @@ private:
     /**
      * @brief Get socket statistics
      * @return Statistics of socket traffic
-     */    
-    std::shared_ptr<SocketStats> get_socket_stats() const;    
+     */
+    std::shared_ptr<SocketStats> get_socket_stats() const;
 
   private:
     /**
@@ -173,13 +171,13 @@ private:
     std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
 
     /**
-    * @brief I/O context for socket operations
-    */
+     * @brief I/O context for socket operations
+     */
     boost::asio::io_context* m_io_context;
 
     /**
-    * @brief Ensures no race on queue
-    */    
+     * @brief Ensures no race on queue
+     */
     std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;
   };
 
@@ -207,7 +205,7 @@ private:
     /**
      * @brief Get socket statistics
      * @return Statistics of socket traffic
-     */    
+     */
     std::shared_ptr<SocketStats> get_socket_stats() const;
 
   private:
@@ -233,19 +231,19 @@ private:
     std::queue<GenericReceiverConcept::TypeErasedPayload> m_payloads;
 
     /**
-    * @brief I/O context for socket operations
-    */
-    boost::asio::io_context* m_io_context;    
+     * @brief I/O context for socket operations
+     */
+    boost::asio::io_context* m_io_context;
 
     /**
-    * @brief Remote endpoint
-    */
+     * @brief Remote endpoint
+     */
     boost::asio::ip::udp::endpoint m_remote_endpoint;
 
     /**
-    * @brief Ensures no race on queue
-    */    
-    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;    
+     * @brief Ensures no race on queue
+     */
+    std::shared_ptr<boost::asio::strand<boost::asio::io_context::executor_type>> m_strand;
   };
 
   // Commands
@@ -265,12 +263,12 @@ private:
   /**
    * @brief Gets dal inputs
    * @param mdal SocketDataWriterModule dal
-   */   
+   */
   void get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal);
 
   /**
    * @brief Data consume thread function
-   */   
+   */
   void run_consume();
 
   /**
@@ -298,33 +296,33 @@ private:
    */
   std::shared_ptr<WriterInfo> m_writer_info;
 
-  // RECEIVER  
+  // RECEIVER
   /**
    * @brief Generic receiver
-   */    
+   */
   std::shared_ptr<GenericReceiverConcept> m_receiver;
 
   /**
    * @brief Receiver timeout in ms
-   */    
+   */
   std::chrono::milliseconds m_receiver_timeout_ms{ default_receiver_timeout_ms };
-  
+
   // CONSUMER
   /**
    * @brief Data consume thread
-   */     
+   */
   utilities::ReusableThread m_consumer_thread;
 
   /**
    * @brief Whether consumer thread should continue
-   */    
-  std::atomic<bool> m_run_marker { false };
+   */
+  std::atomic<bool> m_run_marker{ false };
 
   // RUN START T0
   /**
    * @brief Timestamp used to measure time between opmon reports
-   */   
-  std::chrono::time_point<std::chrono::steady_clock> m_t0;  
+   */
+  std::chrono::time_point<std::chrono::steady_clock> m_t0;
 };
 
 } // namespace dunedaq::asiolibs

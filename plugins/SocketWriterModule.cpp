@@ -11,13 +11,13 @@
 #include "CreateGenericReceiver.hpp"
 
 #include "appfwk/ConfigurationManager.hpp"
-#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataReceiver.hpp"
-#include "appmodel/SocketDetectorToDaqConnection.hpp"
+#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/SocketDataWriterModule.hpp"
+#include "appmodel/SocketDetectorToDaqConnection.hpp"
 #include "confmodel/DetectorStream.hpp"
-#include "confmodel/QueueWithSourceId.hpp"
 #include "confmodel/NetworkInterface.hpp"
+#include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
@@ -25,10 +25,10 @@
 
 #include "asiolibs/AsioIssues.hpp"
 
-#include <string>
 #include <memory>
-#include <vector>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace dunedaq::asiolibs {
 
@@ -41,10 +41,10 @@ SocketWriterModule::SocketWriterModule(const std::string& name)
   register_command("stop_trigger_sources", &SocketWriterModule::do_stop);
 }
 
-void 
+void
 SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModule* mdal)
 {
-  auto* con = mdal->get_inputs()[0]; // there's only 1 input  
+  auto* con = mdal->get_inputs()[0]; // there's only 1 input
   auto* queue = con->cast<confmodel::Queue>();
   if (queue == nullptr) {
     auto err = datahandlinglibs::InitializationError(ERS_HERE, "Input is not of type Queue.");
@@ -64,7 +64,8 @@ SocketWriterModule::get_dal_inputs(const dunedaq::appmodel::SocketDataWriterModu
   m_receiver = createGenericReceiver(connection_name);
   // Input connection sensibility check
   if (m_receiver == nullptr) {
-    //ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!")); FIXME (DTE)
+    // ers::error(datahandlinglibs::ConfigurationError(ERS_HERE, sid, "Non callback mode, and receiver is unset!"));
+    // FIXME (DTE)
   }
 }
 
@@ -78,34 +79,36 @@ SocketWriterModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto* d2d_conn = mdal->get_connection();
   auto* socket_d2d_conn = d2d_conn->cast<appmodel::SocketDetectorToDaqConnection>();
   if (socket_d2d_conn == nullptr) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE, "Connection is not of type SocketDetectorToDaqConnection.");
+    auto err =
+      datahandlinglibs::InitializationError(ERS_HERE, "Connection is not of type SocketDetectorToDaqConnection.");
     ers::fatal(err);
     throw err;
-  } 
+  }
 
   auto nw_receiver = socket_d2d_conn->get_net_receiver();
   auto remote_ip = nw_receiver->get_uses()->get_ip_address()[0];
 
-  auto* nw_sender = socket_d2d_conn->get_net_senders()[0]; // there's only 1 sender   
+  auto* nw_sender = socket_d2d_conn->get_net_senders()[0]; // there's only 1 sender
 
   auto* socket_sender = nw_sender->cast<appmodel::SocketDataSender>();
   if (socket_sender == nullptr) {
     auto err = datahandlinglibs::InitializationError(ERS_HERE, "Sender is not of type SocketDataSender.");
     ers::fatal(err);
     throw err;
-  }  
+  }
 
   auto local_ip = socket_sender->get_uses()->get_ip_address()[0];
   auto local_port = socket_sender->get_local_port();
   auto remote_port = socket_sender->get_remote_port();
-  
-  m_writer_info = std::make_shared<WriterInfo>(local_ip, local_port, remote_ip, remote_port, std::make_shared<SocketStats>());
-    
+
+  m_writer_info =
+    std::make_shared<WriterInfo>(local_ip, local_port, remote_ip, remote_port, std::make_shared<SocketStats>());
+
   if (string_to_socket_type(socket_sender->get_socket_type()) == SocketType::TCP) {
     m_writer = std::make_shared<std::variant<TCPWriter, UDPWriter>>(TCPWriter{});
   } else {
-    m_writer = std::make_shared<std::variant<TCPWriter, UDPWriter>>(UDPWriter{});      
-  }    
+    m_writer = std::make_shared<std::variant<TCPWriter, UDPWriter>>(UDPWriter{});
+  }
 }
 
 SocketWriterModule::SocketType
@@ -122,7 +125,7 @@ SocketWriterModule::string_to_socket_type(const std::string& socket_type) const
 void
 SocketWriterModule::do_configure(const CommandData_t&)
 {
-  std::visit([this](auto& writer) { writer.configure(m_io_context, m_writer_info); }, *m_writer);    
+  std::visit([this](auto& writer) { writer.configure(m_io_context, m_writer_info); }, *m_writer);
 }
 
 void
@@ -142,7 +145,7 @@ SocketWriterModule::do_start(const CommandData_t&)
   m_io_thread = std::jthread([this] { m_io_context.run(); });
 }
 
-void 
+void
 SocketWriterModule::run_consume()
 {
   TLOG() << "Consumer thread started..."; // TODO (DTE): Make debug logs
@@ -158,7 +161,6 @@ SocketWriterModule::run_consume()
 
   TLOG() << "Consumer thread joins... ";
 }
-
 
 void
 SocketWriterModule::do_stop(const CommandData_t&)
@@ -188,14 +190,15 @@ SocketWriterModule::generate_opmon_data()
 
   stats.set_rate_payloads_consumed(new_packets / seconds / 1000.);
 
-  publish(std::move(stats), { { "socket-writer", m_writer_info->local_ip + ":" + std::to_string(m_writer_info->local_port) } });
+  publish(std::move(stats),
+          { { "socket-writer", m_writer_info->local_ip + ":" + std::to_string(m_writer_info->local_port) } });
 }
 
 void
 SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info)
 {
   m_io_context = &io_context;
-  m_strand = std::make_shared<boost::asio::strand<boost::asio::io_context::executor_type>>(io_context.get_executor());  
+  m_strand = std::make_shared<boost::asio::strand<boost::asio::io_context::executor_type>>(io_context.get_executor());
 
   m_socket_stats = writer_info->socket_stats;
 
@@ -206,30 +209,29 @@ SocketWriterModule::TCPWriter::configure(boost::asio::io_context& io_context, st
     local_address = boost::asio::ip::make_address(writer_info->local_ip);
     remote_address = boost::asio::ip::make_address(writer_info->remote_ip);
   } catch (const boost::system::system_error& e) {
-    TLOG() << "Failed to configure TCP socket: " << e.what()
-      << " (Local IP: " << writer_info->local_ip << ", Remote IP: " << writer_info->remote_ip  << ")";
+    TLOG() << "Failed to configure TCP socket: " << e.what() << " (Local IP: " << writer_info->local_ip
+           << ", Remote IP: " << writer_info->remote_ip << ")";
     throw;
   }
 
   while (true) {
     try {
       m_socket = std::make_unique<boost::asio::ip::tcp::socket>(io_context);
-      m_socket->open(boost::asio::ip::tcp::v4());      
+      m_socket->open(boost::asio::ip::tcp::v4());
       m_socket->bind(boost::asio::ip::tcp::endpoint(local_address, writer_info->local_port));
       m_socket->connect(boost::asio::ip::tcp::endpoint(remote_address, writer_info->remote_port));
       break;
     } catch (const boost::system::system_error& e) {
       TLOG() << "Failed to create TCP socket: " << e.what() << ". Retrying in 1 second..."
-        << " (Local IP: " << writer_info->local_ip << ", Local port: " << writer_info->local_port
-        << ", Remote IP: " << writer_info->remote_ip << ", Remote port: " << writer_info->remote_port << ")";      
+             << " (Local IP: " << writer_info->local_ip << ", Local port: " << writer_info->local_port
+             << ", Remote IP: " << writer_info->remote_ip << ", Remote port: " << writer_info->remote_port << ")";
       std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   }
 
-  TLOG() << "Established TCP connection from "
-    << m_socket->local_endpoint().address().to_string() << ":" << m_socket->local_endpoint().port()
-    << " to "
-    << m_socket->remote_endpoint().address().to_string() << ":" << m_socket->remote_endpoint().port();  
+  TLOG() << "Established TCP connection from " << m_socket->local_endpoint().address().to_string() << ":"
+         << m_socket->local_endpoint().port() << " to " << m_socket->remote_endpoint().address().to_string() << ":"
+         << m_socket->remote_endpoint().port();
 }
 
 void
@@ -240,7 +242,7 @@ SocketWriterModule::TCPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload
     if (m_payloads.size() == 1) { // queue was empty
       boost::asio::co_spawn(*m_strand, start(), boost::asio::detached);
     }
-  });  
+  });
 }
 
 boost::asio::awaitable<void>
@@ -248,9 +250,9 @@ SocketWriterModule::TCPWriter::start()
 {
   while (!m_payloads.empty()) {
     auto payload = std::move(m_payloads.front());
-    
-    auto bytes_sent =
-    co_await boost::asio::async_write(*m_socket, boost::asio::buffer(payload.data, payload.size), boost::asio::use_awaitable);
+
+    auto bytes_sent = co_await boost::asio::async_write(
+      *m_socket, boost::asio::buffer(payload.data, payload.size), boost::asio::use_awaitable);
     m_payloads.pop();
 
     ++m_socket_stats->num_payloads;
@@ -272,35 +274,35 @@ SocketWriterModule::TCPWriter::stop()
 std::shared_ptr<SocketWriterModule::SocketStats>
 SocketWriterModule::TCPWriter::get_socket_stats() const
 {
-  return m_socket_stats;  
+  return m_socket_stats;
 }
 
 void
 SocketWriterModule::UDPWriter::configure(boost::asio::io_context& io_context, std::shared_ptr<WriterInfo> writer_info)
 {
   m_io_context = &io_context;
-  m_strand = std::make_shared<boost::asio::strand<boost::asio::io_context::executor_type>>(io_context.get_executor());  
+  m_strand = std::make_shared<boost::asio::strand<boost::asio::io_context::executor_type>>(io_context.get_executor());
 
   m_socket_stats = writer_info->socket_stats;
 
   try {
-    boost::asio::ip::udp::endpoint writer_endpoint(
-      boost::asio::ip::address::from_string(writer_info->local_ip), writer_info->local_port);
+    boost::asio::ip::udp::endpoint writer_endpoint(boost::asio::ip::address::from_string(writer_info->local_ip),
+                                                   writer_info->local_port);
 
-    m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, writer_endpoint);     
+    m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, writer_endpoint);
 
-    m_remote_endpoint = boost::asio::ip::udp::endpoint(
-      boost::asio::ip::address::from_string(writer_info->remote_ip), writer_info->remote_port);
+    m_remote_endpoint = boost::asio::ip::udp::endpoint(boost::asio::ip::address::from_string(writer_info->remote_ip),
+                                                       writer_info->remote_port);
 
-    TLOG() << "Created UDP socket on "
-      << m_socket->local_endpoint().address() << ":" << m_socket->local_endpoint().port(); 
+    TLOG() << "Created UDP socket on " << m_socket->local_endpoint().address() << ":"
+           << m_socket->local_endpoint().port();
 
   } catch (const boost::system::system_error& e) {
-    TLOG() << "Failed to create UDP socket: " << e.what()
-      << " (Local IP: " << writer_info->local_ip << ", Local port: " << writer_info->local_port
-      << ", Remote IP: " << writer_info->remote_ip << ", Remote port: " << writer_info->remote_port << ")";
+    TLOG() << "Failed to create UDP socket: " << e.what() << " (Local IP: " << writer_info->local_ip
+           << ", Local port: " << writer_info->local_port << ", Remote IP: " << writer_info->remote_ip
+           << ", Remote port: " << writer_info->remote_port << ")";
     throw;
-  }          
+  }
 }
 
 void
@@ -311,7 +313,7 @@ SocketWriterModule::UDPWriter::enqueue(GenericReceiverConcept::TypeErasedPayload
     if (m_payloads.size() == 1) { // queue was empty
       boost::asio::co_spawn(*m_strand, start(), boost::asio::detached);
     }
-  });    
+  });
 }
 
 boost::asio::awaitable<void>
@@ -319,15 +321,15 @@ SocketWriterModule::UDPWriter::start()
 {
   while (!m_payloads.empty()) {
     auto payload = std::move(m_payloads.front());
-    
+
     const auto bytes_sent = co_await m_socket->async_send_to(
       boost::asio::buffer(payload.data, payload.size), m_remote_endpoint, boost::asio::use_awaitable);
-    m_payloads.pop();   
+    m_payloads.pop();
 
     ++m_socket_stats->num_payloads;
     ++m_socket_stats->sum_payloads;
     m_socket_stats->sum_bytes.fetch_add(bytes_sent);
-    ++m_socket_stats->stats_packet_count;  
+    ++m_socket_stats->stats_packet_count;
   }
 }
 
@@ -343,7 +345,7 @@ SocketWriterModule::UDPWriter::stop()
 std::shared_ptr<SocketWriterModule::SocketStats>
 SocketWriterModule::UDPWriter::get_socket_stats() const
 {
-  return m_socket_stats;  
+  return m_socket_stats;
 }
 
 } // namespace dunedaq::asiolibs

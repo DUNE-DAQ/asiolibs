@@ -8,14 +8,15 @@
 #ifndef ASIOLIBS_INCLUDE_ASIOLIBS_ASIOISSUES_HPP_
 #define ASIOLIBS_INCLUDE_ASIOLIBS_ASIOISSUES_HPP_
 
-#include <ers/Issue.hpp>
 #include "logging/Logging.hpp" // NOTE: if ISSUES ARE DECLARED BEFORE include logging/Logging.hpp, TLOG_DEBUG<<issue wont work.
+#include <ers/Issue.hpp>
 
 namespace dunedaq {
 
 ERS_DECLARE_ISSUE(asiolibs,
                   InvalidRawReceiverTimeout,
-                  "recv_timeout_ms is 0 or missing in the configuration. The default value " << raw_receiver_timeout_ms << " will be used.",
+                  "recv_timeout_ms is 0 or missing in the configuration. The default value " << raw_receiver_timeout_ms
+                                                                                             << " will be used.",
                   ((int)raw_receiver_timeout_ms))
 
 } // namespace dunedaq
