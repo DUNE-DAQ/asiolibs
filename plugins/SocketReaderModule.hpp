@@ -16,8 +16,8 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace dunedaq::asiolibs {
 
@@ -26,7 +26,7 @@ class SourceConcept;
 class SocketReaderModule : public dunedaq::appfwk::DAQModule
 {
 public:
-  using remote_t = std::pair<std::string, uint32_t>; // NOLINT(build/unsigned)
+  using remote_t = std::pair<std::string, uint32_t>;          // NOLINT(build/unsigned)
   using remote_stream_pair_t = std::pair<remote_t, uint32_t>; // NOLINT(build/unsigned)
   using remote_source_map_t = std::map<remote_stream_pair_t, std::shared_ptr<SourceConcept>>;
 
@@ -71,7 +71,7 @@ private:
     /**
      * @brief Counts packets since last opmon data generation
      */
-    std::atomic<int> stats_packet_count{ 0 };        
+    std::atomic<int> stats_packet_count{ 0 };
   };
 
   struct ReaderInfo
@@ -123,7 +123,7 @@ private:
 
     /**
      * @brief Connected remote
-     */    
+     */
     remote_t m_remote;
 
     /**
@@ -214,9 +214,8 @@ private:
 
   /**
    * @brief Map between a pair of {remote, stream} and the corresponding source
-   */    
-  remote_source_map_t m_remote_to_source;  
-
+   */
+  remote_source_map_t m_remote_to_source;
 };
 
 } // namespace dunedaq::asiolibs

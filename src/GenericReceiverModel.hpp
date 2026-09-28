@@ -10,9 +10,9 @@
 
 #include "GenericReceiverConcept.hpp"
 
+#include <memory>
 #include <string>
 #include <utility>
-#include <memory>
 
 namespace dunedaq::asiolibs {
 
@@ -22,9 +22,11 @@ class GenericReceiverModel : public GenericReceiverConcept
 public:
   explicit GenericReceiverModel(const std::string& receiver_connection_name)
     : m_receiver(get_iom_receiver<TargetPayloadType>(receiver_connection_name))
-  {}
+  {
+  }
 
-  std::optional<TypeErasedPayload> try_receive(dunedaq::iomanager::Receiver::timeout_t timeout) override {
+  std::optional<TypeErasedPayload> try_receive(dunedaq::iomanager::Receiver::timeout_t timeout) override
+  {
     auto opt_payload = m_receiver->try_receive(timeout);
     if (opt_payload) {
       // Allocate the received payload on the heap with shared ownership,
@@ -34,7 +36,7 @@ public:
     }
     return std::nullopt;
   }
-  
+
 private:
   /**
    * @brief Generic IOManager Receiver

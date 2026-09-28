@@ -23,14 +23,14 @@ DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTBernFrame, "CRTBernFrame")
 DUNE_DAQ_TYPESTRING(dunedaq::fddetdataformats::CRTGrenobleFrame, "CRTGrenobleFrame")
 
 namespace dunedaq::asiolibs {
- 
+
 std::shared_ptr<GenericReceiverConcept>
 createGenericReceiver(const std::string& receiver_connection_name)
 {
   const auto datatypes = dunedaq::iomanager::IOManager::get()->get_datatypes(receiver_connection_name);
   if (datatypes.size() != 1) {
-    ers::error(datahandlinglibs::GenericConfigurationError(ERS_HERE,
-      "Multiple input data types specified! Expected only a single type!"));
+    ers::error(datahandlinglibs::GenericConfigurationError(
+      ERS_HERE, "Multiple input data types specified! Expected only a single type!"));
   }
   const std::string dt = *datatypes.begin();
   TLOG() << "Choosing specializations for GenericReceiverConcept for input connection "

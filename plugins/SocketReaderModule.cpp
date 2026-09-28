@@ -11,22 +11,22 @@
 #include "CreateSource.hpp"
 
 #include "appmodel/DataReaderModule.hpp"
-#include "appmodel/SocketDetectorToDaqConnection.hpp"
-#include "appmodel/SocketDataSender.hpp"
 #include "appmodel/NWDetDataReceiver.hpp"
+#include "appmodel/SocketDataSender.hpp"
+#include "appmodel/SocketDetectorToDaqConnection.hpp"
 #include "confmodel/DetectorStream.hpp"
-#include "confmodel/QueueWithSourceId.hpp"
 #include "confmodel/GeoId.hpp"
 #include "confmodel/NetworkInterface.hpp"
+#include "confmodel/QueueWithSourceId.hpp"
 
 #include "datahandlinglibs/DataHandlingIssues.hpp"
 
 #include "asiolibs/opmon/SocketReaderModule.pb.h"
 
-#include <string>
-#include <vector>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace dunedaq::asiolibs {
 
@@ -45,7 +45,8 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto* mdal = mcfg->get_dal<appmodel::DataReaderModule>(get_name());
 
   if (mdal->get_raw_data_callbacks().empty()) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE, "No outputs defined for socket reader in configuration.");
+    auto err =
+      datahandlinglibs::InitializationError(ERS_HERE, "No outputs defined for socket reader in configuration.");
     ers::fatal(err);
     throw err;
   }
@@ -60,10 +61,11 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
   auto* d2d_conn = mdal->get_connections()[0]; // there's only 1 connection
   auto* socket_d2d_conn = d2d_conn->cast<appmodel::SocketDetectorToDaqConnection>();
   if (socket_d2d_conn == nullptr) {
-    auto err = datahandlinglibs::InitializationError(ERS_HERE, "Connection is not of type SocketDetectorToDaqConnection.");
+    auto err =
+      datahandlinglibs::InitializationError(ERS_HERE, "Connection is not of type SocketDetectorToDaqConnection.");
     ers::fatal(err);
     throw err;
-  }  
+  }
 
   auto nw_receiver = socket_d2d_conn->get_net_receiver();
   auto local_ip = nw_receiver->get_uses()->get_ip_address()[0];
@@ -78,20 +80,18 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
       auto err = datahandlinglibs::InitializationError(ERS_HERE, "Sender is not of type SocketDataSender.");
       ers::fatal(err);
       throw err;
-    }  
+    }
 
     auto local_port = socket_sender->get_remote_port();
-    
-    m_reader_infos.emplace_back(
-      std::make_shared<ReaderInfo>(
-        local_ip, local_port, std::make_shared<SocketStats>()));
-    
+
+    m_reader_infos.emplace_back(std::make_shared<ReaderInfo>(local_ip, local_port, std::make_shared<SocketStats>()));
+
     if (string_to_socket_type(socket_sender->get_socket_type()) == SocketType::TCP) {
       m_readers.push_back(std::make_shared<std::variant<TCPReader, UDPReader>>(TCPReader{}));
     } else {
       m_readers.push_back(std::make_shared<std::variant<TCPReader, UDPReader>>(UDPReader{}));
-    } 
-    
+    }
+
     auto remote_ip = socket_sender->get_uses()->get_ip_address()[0];
     auto remote_port = socket_sender->get_local_port();
 
@@ -101,9 +101,10 @@ SocketReaderModule::init(const std::shared_ptr<appfwk::ConfigurationManager> mcf
         continue;
       }
 
-      remote_stream_pair_t sender_stream_pair = { { remote_ip, remote_port}, det_stream->get_geo_id()->get_stream_id() };
+      remote_stream_pair_t sender_stream_pair = { { remote_ip, remote_port },
+                                                  det_stream->get_geo_id()->get_stream_id() };
       m_remote_to_source[sender_stream_pair] = m_sources[det_stream->get_source_id()];
-    }        
+    }
   }
 }
 
@@ -168,7 +169,8 @@ SocketReaderModule::generate_opmon_data()
     opmon::SocketReaderStats stats;
     stats.set_packets_received(reader_info->socket_stats->packets_received.load());
     stats.set_bytes_received(reader_info->socket_stats->bytes_received.load());
-    publish(std::move(stats), { { "socket-reader", reader_info->local_ip + ":" + std::to_string(reader_info->local_port) } });
+    publish(std::move(stats),
+            { { "socket-reader", reader_info->local_ip + ":" + std::to_string(reader_info->local_port) } });
   }
 }
 
@@ -184,24 +186,21 @@ SocketReaderModule::TCPReader::configure(boost::asio::io_context& io_context, st
   try {
     local_address = boost::asio::ip::make_address(reader_info->local_ip);
   } catch (const boost::system::system_error& e) {
-    TLOG() << "Failed to configure TCP socket: " << e.what()
-      << " (Local IP: " << reader_info->local_ip << ")";
+    TLOG() << "Failed to configure TCP socket: " << e.what() << " (Local IP: " << reader_info->local_ip << ")";
     throw;
   }
 
-  boost::asio::ip::tcp::acceptor acceptor(
-    io_context, boost::asio::ip::tcp::endpoint(local_address, reader_info->local_port));
+  boost::asio::ip::tcp::acceptor acceptor(io_context,
+                                          boost::asio::ip::tcp::endpoint(local_address, reader_info->local_port));
 
   TLOG() << "Waiting for TCP connection at " << reader_info->local_ip << ":" << reader_info->local_port;
 
   acceptor.accept(*m_socket);
 
-  m_remote = { m_socket->remote_endpoint().address().to_string(), m_socket->remote_endpoint().port() } ;
+  m_remote = { m_socket->remote_endpoint().address().to_string(), m_socket->remote_endpoint().port() };
 
-  TLOG() << "Established TCP connection from "
-    << m_socket->local_endpoint().address().to_string() << ":" << m_socket->local_endpoint().port()
-    << " to "
-    << m_remote.first << ":" << m_remote.second;
+  TLOG() << "Established TCP connection from " << m_socket->local_endpoint().address().to_string() << ":"
+         << m_socket->local_endpoint().port() << " to " << m_remote.first << ":" << m_remote.second;
 }
 
 boost::asio::awaitable<void>
@@ -212,21 +211,20 @@ SocketReaderModule::TCPReader::start(const remote_source_map_t& remote_to_source
 
   while (m_socket->is_open()) {
     const auto bytes_received =
-      co_await boost::asio::async_read(*m_socket,
-                                       boost::asio::buffer(buffer),
-                                       boost::asio::use_awaitable);
+      co_await boost::asio::async_read(*m_socket, boost::asio::buffer(buffer), boost::asio::use_awaitable);
 
     const auto* daq_header = reinterpret_cast<const dunedaq::detdataformats::DAQEthHeader*>(buffer.data());
-    
+
     auto stream_id = static_cast<unsigned>(daq_header->stream_id);
     remote_stream_pair_t sender_stream_pair = { m_remote, stream_id };
-    
-    auto src_it = remote_to_source.find(sender_stream_pair);    
+
+    auto src_it = remote_to_source.find(sender_stream_pair);
     if (src_it == remote_to_source.end()) {
-      TLOG() << "Unexpected sender-stream combination! (" << m_remote.first << ":" << m_remote.second << ", " << stream_id << ")";
+      TLOG() << "Unexpected sender-stream combination! (" << m_remote.first << ":" << m_remote.second << ", "
+             << stream_id << ")";
       continue;
     }
-    
+
     src_it->second->handle_daq_frame(buffer.data());
 
     ++m_socket_stats->packets_received;
@@ -250,19 +248,19 @@ SocketReaderModule::UDPReader::configure(boost::asio::io_context& io_context, st
   m_socket_stats = reader_info->socket_stats;
 
   try {
-    boost::asio::ip::udp::endpoint writer_endpoint(
-      boost::asio::ip::address::from_string(reader_info->local_ip), reader_info->local_port);
+    boost::asio::ip::udp::endpoint writer_endpoint(boost::asio::ip::address::from_string(reader_info->local_ip),
+                                                   reader_info->local_port);
 
     m_socket = std::make_unique<boost::asio::ip::udp::socket>(io_context, writer_endpoint);
 
-    TLOG() << "Created UDP socket on "
-      << m_socket->local_endpoint().address() << ":" << m_socket->local_endpoint().port();      
+    TLOG() << "Created UDP socket on " << m_socket->local_endpoint().address() << ":"
+           << m_socket->local_endpoint().port();
 
   } catch (const boost::system::system_error& e) {
-    TLOG() << "Failed to configure UDP socket: " << e.what()
-      << " (Local IP: " << reader_info->local_ip << ", Local port: " << reader_info->local_port << ")";
+    TLOG() << "Failed to configure UDP socket: " << e.what() << " (Local IP: " << reader_info->local_ip
+           << ", Local port: " << reader_info->local_port << ")";
     throw;
-  }  
+  }
 }
 
 boost::asio::awaitable<void>
@@ -273,23 +271,24 @@ SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source
   boost::asio::ip::udp::endpoint sender_endpoint;
 
   while (m_socket->is_open()) {
-    std::size_t bytes_received = co_await m_socket->async_receive_from(
-      boost::asio::buffer(buffer), sender_endpoint, boost::asio::use_awaitable);
+    std::size_t bytes_received =
+      co_await m_socket->async_receive_from(boost::asio::buffer(buffer), sender_endpoint, boost::asio::use_awaitable);
 
     const auto* daq_header = reinterpret_cast<const dunedaq::detdataformats::DAQEthHeader*>(buffer.data());
 
     auto stream_id = static_cast<unsigned>(daq_header->stream_id);
 
-    remote_t remote = { sender_endpoint.address().to_string(), sender_endpoint.port() } ;
+    remote_t remote = { sender_endpoint.address().to_string(), sender_endpoint.port() };
     remote_stream_pair_t sender_stream_pair = { remote, stream_id };
-    
+
     auto src_it = remote_to_source.find(sender_stream_pair);
-    
+
     if (src_it == remote_to_source.end()) {
-      TLOG() << "Unexpected sender-stream combination! (" << remote.first << ":" << remote.second << ", " << stream_id << ")";
+      TLOG() << "Unexpected sender-stream combination! (" << remote.first << ":" << remote.second << ", " << stream_id
+             << ")";
       continue;
     }
-    
+
     if (bytes_received == buffer_size) [[likely]] {
       src_it->second->handle_daq_frame(buffer.data());
     } else {
@@ -298,7 +297,7 @@ SocketReaderModule::UDPReader::start(const remote_source_map_t& remote_to_source
 
     ++m_socket_stats->packets_received;
     m_socket_stats->bytes_received.fetch_add(bytes_received);
-    ++m_socket_stats->stats_packet_count;    
+    ++m_socket_stats->stats_packet_count;
   }
 }
 
